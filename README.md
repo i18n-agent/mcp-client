@@ -6,22 +6,22 @@ Easy installation and setup of i18n-agent MCP client for AI development environm
 
 ### Claude Code
 ```bash
-npx i18n-agent-mcp-client install --claude-code
+npx @i18n-agent/mcp-client install --claude-code
 ```
 
 ### Gemini IDE
 ```bash
-npx i18n-agent-mcp-client install --gemini
+npx @i18n-agent/mcp-client install --gemini
 ```
 
 ### Cursor
 ```bash
-npx i18n-agent-mcp-client install --cursor
+npx @i18n-agent/mcp-client install --cursor
 ```
 
 ### Interactive Installation
 ```bash
-npx i18n-agent-mcp-client install
+npx @i18n-agent/mcp-client install
 ```
 
 ## What You Get
@@ -50,7 +50,7 @@ The installer provides **three easy ways** to handle your API key:
 
 #### Option 1: Let the installer guide you (Recommended)
 ```bash
-npx i18n-agent-mcp-client install --claude-code
+npx @i18n-agent/mcp-client install --claude-code
 ```
 The installer will:
 - Show you where to get your API key
@@ -60,7 +60,7 @@ The installer will:
 
 #### Option 2: Pass your API key directly
 ```bash
-npx i18n-agent-mcp-client install --claude-code --api-key sk-your-api-key-here
+npx @i18n-agent/mcp-client install --claude-code --api-key sk-your-api-key-here
 ```
 
 #### Option 3: Use the demo key for quick testing
@@ -79,7 +79,7 @@ The installer can automatically open this page for you!
 
 For enterprise deployments:
 ```bash
-npx i18n-agent-mcp-client install --claude-code --server-url https://your-server.com
+npx @i18n-agent/mcp-client install --claude-code --server-url https://your-server.com
 ```
 
 ## Commands
@@ -87,7 +87,7 @@ npx i18n-agent-mcp-client install --claude-code --server-url https://your-server
 ### Install
 Install MCP client for your IDE:
 ```bash
-npx i18n-agent-mcp-client install [options]
+npx @i18n-agent/mcp-client install [options]
 ```
 
 Options:
@@ -100,13 +100,13 @@ Options:
 ### Status
 Check installation status:
 ```bash
-npx i18n-agent-mcp-client status
+npx @i18n-agent/mcp-client status
 ```
 
 ### Uninstall
 Remove MCP client configuration:
 ```bash
-npx i18n-agent-mcp-client uninstall [options]
+npx @i18n-agent/mcp-client uninstall [options]
 ```
 
 ## Supported IDEs
