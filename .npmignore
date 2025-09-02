@@ -1,0 +1,20 @@
+# Development files
+test.js
+.gitignore
+.env*
+
+# IDE and OS files
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+
+# Git
+.git/
+
+# Test outputs
+test-results/
+
+# Temporary files
+tmp/
+temp/
