@@ -9,6 +9,9 @@ Professional translation service client for Claude, Cursor, VS Code, and other A
 
 - **🎯 Smart Translation**: Context-aware translations with cultural adaptation
 - **📁 File Translation**: Support for JSON, YAML, CSV, XML, Markdown, and more
+- **⚡ Large File Support**: Async processing for files >50KB with progress tracking
+- **🔄 Timeout Improvements**: Extended timeouts (5-10 min) for large translations
+- **📊 Progress Tracking**: Real-time job status and completion monitoring
 - **💰 Credit Tracking**: Real-time credit balance and word count estimates
 - **🌐 30+ Languages**: Multi-tier language support with quality ratings
 - **🔧 Easy Setup**: One-command installation for major AI IDEs
@@ -180,6 +183,16 @@ Create `.cursor/mcp_settings.json` or `.vscode/mcp_settings.json`:
 - **Preserve Structure**: Keeps original file format and structure
 - **Output Format**: Convert between formats (JSON ↔ YAML ↔ CSV)
 - **Large Files**: Automatically chunks large files for processing
+- **Async Processing**: Files >50KB processed asynchronously with job tracking
+- **Progress Monitoring**: Real-time status updates for long-running translations
+- **Timeout Resilience**: Up to 10 minutes for large translation jobs
+
+### Large Translation Handling
+- **Async Processing**: >100 texts or >50KB files processed asynchronously
+- **Job Tracking**: Unique job IDs for monitoring long-running translations
+- **Progress Updates**: Real-time completion percentages and status
+- **Extended Timeouts**: 5-10 minute timeouts prevent interruptions
+- **Automatic Polling**: Client automatically polls for job completion
 
 ### Credit Management
 - **Cost**: 0.001 credits per word

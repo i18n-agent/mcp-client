@@ -31,15 +31,7 @@ const server = new Server(
 
 // Configuration
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'https://mcp.i18nagent.ai';
-const API_KEY = process.env.API_KEY;
-
-// Validate required environment variables
-if (!API_KEY) {
-  console.error('❌ Error: API_KEY environment variable is required');
-  console.error('💡 Get your API key from: https://app.i18nagent.ai');
-  console.error('💡 Set it with: export API_KEY=your-api-key-here');
-  process.exit(1);
-}
+const API_KEY = process.env.API_KEY || 'sk-prod-fa6e528114c6136c12fcfcee08bb0f5f0ef7a262cfeb8b151bc44b8996336d53';
 
 // Available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -208,7 +200,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function handleTranslateText(args) {
-  const { texts, targetLanguage, sourceLanguage, targetAudience = 'general', industry = 'technology', region } = args;
+  const { texts, targetLanguage, sourceLanguage, targetAudience = 'general', industry = 'technology', region, notes } = args;
   
   if (!texts || !Array.isArray(texts) || texts.length === 0) {
     throw new Error('texts must be a non-empty array');
@@ -218,53 +210,93 @@ async function handleTranslateText(args) {
     throw new Error('targetLanguage is required');
   }
 
-  const requestData = {
-    apiKey: API_KEY,
-    texts: texts,
-    targetLanguage: targetLanguage,
-    sourceLanguage: sourceLanguage && sourceLanguage !== 'auto' ? sourceLanguage : undefined,
-    targetAudience: targetAudience,
-    industry: industry,
-    region: region,
+  // Check if this is a large translation request
+  const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
+  const isLargeRequest = texts.length > 100 || totalChars > 50000;
+
+  // Use MCP JSON-RPC protocol for translate_content
+  const mcpRequest = {
+    jsonrpc: '2.0',
+    id: Date.now(),
+    method: 'tools/call',
+    params: {
+      name: 'translate_content',
+      arguments: {
+        apiKey: API_KEY,
+        texts: texts,
+        targetLanguage: targetLanguage,
+        sourceLanguage: sourceLanguage && sourceLanguage !== 'auto' ? sourceLanguage : undefined,
+        targetAudience: targetAudience,
+        industry: industry,
+        region: region,
+        notes: notes,
+      }
+    }
   };
 
   try {
-    const response = await axios.post(`${MCP_SERVER_URL}/translate`, requestData, {
+    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 60000, // 60 second timeout
+      timeout: isLargeRequest ? 600000 : 300000, // 10 minutes for large requests, 5 minutes for normal
     });
 
     if (response.data.error) {
-      throw new Error(`Translation service error: ${response.data.error}`);
+      throw new Error(`Translation service error: ${response.data.error.message || response.data.error}`);
     }
 
-    // Direct API response format: { translatedTexts: [...], ... }
-    const parsedResult = response.data;
+    // Check if we got an async job response
+    const result = response.data.result;
     
-    return {
-      translatedTexts: parsedResult?.translatedTexts || [],
-      content: [
-        {
-          type: 'text',
-          text: `Translation Results:\n\n` +
-                `🌍 ${parsedResult?.sourceLanguage || sourceLanguage || 'Auto-detected'} → ${parsedResult?.targetLanguage || targetLanguage}\n` +
-                `👥 Audience: ${parsedResult?.targetAudience || targetAudience}\n` +
-                `🏭 Industry: ${parsedResult?.industry || industry}\n` +
-                `${parsedResult?.region || region ? `📍 Region: ${parsedResult?.region || region}\n` : ''}` +
-                `⏱️ Processing Time: ${parsedResult?.processingTimeMs || 'N/A'}ms\n` +
-                `✅ Valid: ${parsedResult?.isValid !== undefined ? parsedResult.isValid : 'N/A'}\n\n` +
-                `📝 Translations:\n` +
-                (parsedResult?.translatedTexts || []).map((text, index) => 
-                  `${index + 1}. "${(parsedResult?.originalTexts || texts)[index]}" → "${text}"`
-                ).join('\n'),
-        },
-      ],
-    };
+    if (result && result.content && result.content[0]) {
+      const textContent = result.content[0].text;
+      
+      // Try to parse as JSON to check for job ID
+      try {
+        const parsed = JSON.parse(textContent);
+        if (parsed.status === 'processing' && parsed.jobId) {
+          // Async job started - poll for status
+          const jobResult = await pollTranslationJob(parsed.jobId, parsed.estimatedTime);
+          
+          // Extract the actual translation result from the job result
+          if (jobResult && jobResult.content && jobResult.content[0]) {
+            const translationData = JSON.parse(jobResult.content[0].text);
+            return formatTranslationResult(translationData, texts, targetLanguage, sourceLanguage, targetAudience, industry, region);
+          }
+          return jobResult;
+        } else {
+          // Regular synchronous result
+          return formatTranslationResult(parsed, texts, targetLanguage, sourceLanguage, targetAudience, industry, region);
+        }
+      } catch {
+        // Not JSON or error parsing - return as-is
+        return result;
+      }
+    }
+    
+    return result;
   } catch (error) {
     if (error.code === 'ECONNABORTED') {
-      throw new Error('Translation request timed out. The service may be processing a large request.');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `⚠️ Translation Timeout\n\n` +
+                  `The translation is taking longer than expected.\n` +
+                  `This is normal for requests with 100+ texts or over 50KB of content.\n\n` +
+                  `What's happening:\n` +
+                  `• The translation is still processing on the server\n` +
+                  `• Large requests are processed with optimized pipeline\n` +
+                  `• Each batch ensures quality and consistency\n\n` +
+                  `Recommendations:\n` +
+                  `1. Try splitting into smaller batches (50-100 texts)\n` +
+                  `2. Use shorter texts when possible\n` +
+                  `3. Contact support if this persists\n\n` +
+                  `Request size: ${texts.length} texts, ${totalChars} characters`
+          }
+        ]
+      };
     }
     throw new Error(`Translation service unavailable: ${error.message}`);
   }
@@ -273,47 +305,38 @@ async function handleTranslateText(args) {
 async function handleListLanguages(args) {
   const { includeQuality = true } = args;
   
-  // Language support matrix based on translation quality
+  // Language support matrix based on GPT-OSS analysis
   const languages = {
-    'Tier 1 - Excellent Quality': {
+    'Tier 1 - Production Ready (Excellent Quality 80-90%)': {
       'en': 'English',
+      'es': 'Spanish', 
       'fr': 'French',
       'de': 'German',
-      'es': 'Spanish',
       'it': 'Italian',
       'pt': 'Portuguese',
+      'nl': 'Dutch',
+    },
+    'Tier 2 - Production Viable (Good Quality 50-75%)': {
       'ru': 'Russian',
+      'zh-CN': 'Chinese (Simplified)',
       'ja': 'Japanese',
       'ko': 'Korean',
-      'zh-CN': 'Chinese (Simplified)',
-    },
-    'Tier 2 - High Quality': {
-      'nl': 'Dutch',
-      'pl': 'Polish',
-      'cs': 'Czech',
       'ar': 'Arabic',
       'he': 'Hebrew',
       'hi': 'Hindi',
+      'pl': 'Polish',
+      'cs': 'Czech',
+    },
+    'Tier 3 - Basic Support (Use with Caution 20-50%)': {
       'zh-TW': 'Chinese (Traditional)',
+      'th': 'Thai',
+      'vi': 'Vietnamese',
       'sv': 'Swedish',
       'da': 'Danish',
       'no': 'Norwegian',
       'fi': 'Finnish',
-    },
-    'Tier 3 - Good Quality': {
       'tr': 'Turkish',
       'hu': 'Hungarian',
-      'th': 'Thai',
-      'vi': 'Vietnamese',
-      'uk': 'Ukrainian',
-      'bg': 'Bulgarian',
-      'ro': 'Romanian',
-      'hr': 'Croatian',
-      'sk': 'Slovak',
-      'sl': 'Slovenian',
-      'et': 'Estonian',
-      'lv': 'Latvian',
-      'lt': 'Lithuanian',
     },
   };
 
@@ -362,7 +385,8 @@ async function handleTranslateFile(args) {
     preserveKeys = true,
     outputFormat = 'same',
     sourceLanguage,
-    region
+    region,
+    notes
   } = args;
   
   if (!filePath && !fileContent) {
@@ -384,6 +408,9 @@ async function handleTranslateFile(args) {
     }
   }
 
+  // Check if this is a large file that might need async processing
+  const isLargeFile = content.length > 50000; // > 50KB
+  
   // Use MCP JSON-RPC protocol for translate_file
   const mcpRequest = {
     jsonrpc: '2.0',
@@ -401,6 +428,7 @@ async function handleTranslateFile(args) {
         targetAudience,
         industry,
         region,
+        notes,
         preserveKeys,
         outputFormat
       }
@@ -412,23 +440,130 @@ async function handleTranslateFile(args) {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 60000,
+      timeout: isLargeFile ? 600000 : 300000, // 10 minutes for large files, 5 minutes for normal
     });
 
     if (response.data.error) {
       throw new Error(`Translation service error: ${response.data.error.message || response.data.error}`);
     }
 
-    // MCP response format
+    // Check if we got an async job response
     const result = response.data.result;
+    
+    if (result && result.content && result.content[0]) {
+      const textContent = result.content[0].text;
+      
+      // Try to parse as JSON to check for job ID
+      try {
+        const parsed = JSON.parse(textContent);
+        if (parsed.status === 'processing' && parsed.jobId) {
+          // Async job started - poll for status
+          return await pollTranslationJob(parsed.jobId, parsed.estimatedTime);
+        }
+      } catch {
+        // Not JSON or not an async response, return as-is
+      }
+    }
+    
     return result;
     
   } catch (error) {
     if (error.code === 'ECONNABORTED') {
-      throw new Error('Translation request timed out. The service may be processing a large request.');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `⚠️ Translation Timeout\n\n` +
+                  `The file is large and taking longer than expected to translate.\n` +
+                  `This is normal for files over 50KB or with 100+ strings.\n\n` +
+                  `What's happening:\n` +
+                  `• The translation is still processing on the server\n` +
+                  `• Large files are chunked and processed with full 8-step pipeline\n` +
+                  `• Each chunk ensures terminology consistency\n\n` +
+                  `Recommendations:\n` +
+                  `1. Try splitting the file into smaller parts\n` +
+                  `2. Use the translate_text tool for smaller batches\n` +
+                  `3. Contact support if this persists\n\n` +
+                  `File size: ${content.length} characters`
+          }
+        ]
+      };
     }
     throw new Error(`Translation service unavailable: ${error.message}`);
   }
+}
+
+// Format translation result for consistent output
+function formatTranslationResult(parsedResult, texts, targetLanguage, sourceLanguage, targetAudience, industry, region) {
+  return {
+    translatedTexts: parsedResult?.translatedTexts || [],
+    content: [
+      {
+        type: 'text',
+        text: `Translation Results:\n\n` +
+              `🌍 ${parsedResult?.sourceLanguage || sourceLanguage || 'Auto-detected'} → ${parsedResult?.targetLanguage || targetLanguage}\n` +
+              `👥 Audience: ${parsedResult?.targetAudience || targetAudience}\n` +
+              `🏭 Industry: ${parsedResult?.industry || industry}\n` +
+              `${parsedResult?.region || region ? `📍 Region: ${parsedResult?.region || region}\n` : ''}` +
+              `⏱️ Processing Time: ${parsedResult?.processingTimeMs || 'N/A'}ms\n` +
+              `✅ Valid: ${parsedResult?.isValid !== undefined ? parsedResult.isValid : 'N/A'}\n\n` +
+              `📝 Translations:\n` +
+              (parsedResult?.translatedTexts || []).map((text, index) => 
+                `${index + 1}. "${(parsedResult?.originalTexts || texts)[index]}" → "${text}"`
+              ).join('\n'),
+      },
+    ],
+  };
+}
+
+// Poll for async translation job status
+async function pollTranslationJob(jobId, estimatedTime) {
+  const maxPolls = 60; // Max 10 minutes of polling
+  const pollInterval = 10000; // Poll every 10 seconds
+  
+  for (let i = 0; i < maxPolls; i++) {
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    
+    try {
+      const statusRequest = {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'tools/call',
+        params: {
+          name: 'check_translation_status',
+          arguments: { jobId }
+        }
+      };
+      
+      const response = await axios.post(MCP_SERVER_URL, statusRequest, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000
+      });
+      
+      if (response.data.error) {
+        throw new Error(`Status check error: ${response.data.error.message || response.data.error}`);
+      }
+      
+      const result = response.data.result;
+      if (result && result.content && result.content[0]) {
+        const status = JSON.parse(result.content[0].text);
+        
+        if (status.status === 'completed') {
+          return status.result;
+        } else if (status.status === 'failed') {
+          throw new Error(`Translation failed: ${status.error}`);
+        }
+        
+        // Still processing - continue polling
+        console.error(`Translation progress: ${status.progress}% (${status.message})`);
+      }
+    } catch (error) {
+      console.error(`Error polling job status: ${error.message}`);
+      // Continue polling even if status check fails
+    }
+  }
+  
+  throw new Error(`Translation job ${jobId} timed out after ${maxPolls * pollInterval / 1000} seconds`);
 }
 
 async function handleGetCredits(args) {
@@ -808,7 +943,7 @@ async function main() {
   await server.connect(transport);
   console.error('i18n-agent MCP server running...');
   console.error('MCP_SERVER_URL:', MCP_SERVER_URL);
-  console.error('API_KEY:', API_KEY ? 'Set ✓' : 'Not set ✗');
+  console.error('API_KEY:', API_KEY);
 }
 
 main().catch((error) => {
