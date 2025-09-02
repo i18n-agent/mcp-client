@@ -4,7 +4,7 @@
   "description": "MCP client for i18n-agent translation service - supports Claude, Cursor, VS Code, and other AI IDEs",
   "main": "mcp-client.js",
   "bin": {
-    "i18n-agent-install": "./install.js"
+    "i18n-agent-install": "install.js"
   },
   "type": "module",
   "scripts": {
