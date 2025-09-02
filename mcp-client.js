@@ -36,7 +36,7 @@ const API_KEY = process.env.API_KEY;
 // Validate required environment variables
 if (!API_KEY) {
   console.error('❌ Error: API_KEY environment variable is required');
-  console.error('💡 Get your API key from: https://i18nagent.ai/dashboard');
+  console.error('💡 Get your API key from: https://app.i18nagent.ai');
   console.error('💡 Set it with: export API_KEY=your-api-key-here');
   process.exit(1);
 }
@@ -273,38 +273,47 @@ async function handleTranslateText(args) {
 async function handleListLanguages(args) {
   const { includeQuality = true } = args;
   
-  // Language support matrix based on GPT-OSS analysis
+  // Language support matrix based on translation quality
   const languages = {
-    'Tier 1 - Production Ready (Excellent Quality 80-90%)': {
+    'Tier 1 - Excellent Quality': {
       'en': 'English',
-      'es': 'Spanish', 
       'fr': 'French',
       'de': 'German',
+      'es': 'Spanish',
       'it': 'Italian',
       'pt': 'Portuguese',
-      'nl': 'Dutch',
-    },
-    'Tier 2 - Production Viable (Good Quality 50-75%)': {
       'ru': 'Russian',
-      'zh-CN': 'Chinese (Simplified)',
       'ja': 'Japanese',
       'ko': 'Korean',
+      'zh-CN': 'Chinese (Simplified)',
+    },
+    'Tier 2 - High Quality': {
+      'nl': 'Dutch',
+      'pl': 'Polish',
+      'cs': 'Czech',
       'ar': 'Arabic',
       'he': 'Hebrew',
       'hi': 'Hindi',
-      'pl': 'Polish',
-      'cs': 'Czech',
-    },
-    'Tier 3 - Basic Support (Use with Caution 20-50%)': {
       'zh-TW': 'Chinese (Traditional)',
-      'th': 'Thai',
-      'vi': 'Vietnamese',
       'sv': 'Swedish',
       'da': 'Danish',
       'no': 'Norwegian',
       'fi': 'Finnish',
+    },
+    'Tier 3 - Good Quality': {
       'tr': 'Turkish',
       'hu': 'Hungarian',
+      'th': 'Thai',
+      'vi': 'Vietnamese',
+      'uk': 'Ukrainian',
+      'bg': 'Bulgarian',
+      'ro': 'Romanian',
+      'hr': 'Croatian',
+      'sk': 'Slovak',
+      'sl': 'Slovenian',
+      'et': 'Estonian',
+      'lv': 'Latvian',
+      'lt': 'Lithuanian',
     },
   };
 

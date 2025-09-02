@@ -30,7 +30,7 @@ i18n-agent-install
 
 ## 🔑 Setup API Key
 
-1. **Get your API key** from [i18nagent.ai/dashboard](https://i18nagent.ai/dashboard)
+1. **Get your API key** from [app.i18nagent.ai](https://app.i18nagent.ai)
 
 2. **Set environment variable**:
    ```bash
@@ -77,36 +77,45 @@ List supported languages with quality ratings
 
 ## 🌐 Language Support
 
-### Tier 1 - Production Ready (80-90% Quality)
+### Tier 1 - Excellent Quality
 - **en**: English
-- **es**: Spanish  
 - **fr**: French
 - **de**: German
+- **es**: Spanish
 - **it**: Italian
 - **pt**: Portuguese
-- **nl**: Dutch
-
-### Tier 2 - Production Viable (50-75% Quality)
 - **ru**: Russian
-- **zh-CN**: Chinese (Simplified)
 - **ja**: Japanese
 - **ko**: Korean
+- **zh-CN**: Chinese (Simplified)
+
+### Tier 2 - High Quality
+- **nl**: Dutch
+- **pl**: Polish
+- **cs**: Czech
 - **ar**: Arabic
 - **he**: Hebrew
 - **hi**: Hindi
-- **pl**: Polish
-- **cs**: Czech
-
-### Tier 3 - Basic Support (20-50% Quality)
 - **zh-TW**: Chinese (Traditional)
-- **th**: Thai
-- **vi**: Vietnamese
 - **sv**: Swedish
 - **da**: Danish
 - **no**: Norwegian
 - **fi**: Finnish
+
+### Tier 3 - Good Quality
 - **tr**: Turkish
 - **hu**: Hungarian
+- **th**: Thai
+- **vi**: Vietnamese
+- **uk**: Ukrainian
+- **bg**: Bulgarian
+- **ro**: Romanian
+- **hr**: Croatian
+- **sk**: Slovak
+- **sl**: Slovenian
+- **et**: Estonian
+- **lv**: Latvian
+- **lt**: Lithuanian
 
 ## 📁 Supported File Formats
 
@@ -243,12 +252,12 @@ npm test
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-Copyright (c) 2024 FatCouple OÜ
+Copyright (c) 2025 FatCouple OÜ
 
 ## 🔗 Links
 
 - **Website**: [i18nagent.ai](https://i18nagent.ai)
-- **Dashboard**: [i18nagent.ai/dashboard](https://i18nagent.ai/dashboard)
+- **Dashboard**: [app.i18nagent.ai](https://app.i18nagent.ai)
 - **Documentation**: [docs.i18nagent.ai](https://docs.i18nagent.ai)
 - **GitHub**: [github.com/i18n-agent/mcp-client](https://github.com/i18n-agent/mcp-client)
 - **Issues**: [github.com/i18n-agent/mcp-client/issues](https://github.com/i18n-agent/mcp-client/issues)
@@ -261,4 +270,4 @@ Copyright (c) 2024 FatCouple OÜ
 
 ---
 
-Made with ❤️ by [FatCouple OÜ](https://fatcouple.com)
+Made with ❤️ by [FatCouple OÜ](https://fireinbelly.com)

@@ -1,6 +1,6 @@
 {
   "name": "@i18n-agent/mcp-client",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "MCP client for i18n-agent translation service - supports Claude, Cursor, VS Code, and other AI IDEs",
   "main": "mcp-client.js",
   "bin": {
@@ -44,7 +44,8 @@
     "mcp-client.js",
     "install.js",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CONTRIBUTING.md"
   ],
   "publishConfig": {
     "access": "public"

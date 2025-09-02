@@ -179,7 +179,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 You need to set your API key to use the translation service:
 
-1. Get your API key from: https://i18nagent.ai/dashboard
+1. Get your API key from: https://app.i18nagent.ai
 2. Set it as an environment variable:
 
    export API_KEY=your-api-key-here
