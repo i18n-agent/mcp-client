@@ -5,6 +5,8 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
+const MCP_CLIENT_VERSION = '1.4.3';
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -20,7 +22,7 @@ import path from 'path';
 const server = new Server(
   {
     name: 'i18n-agent',
-    version: '1.0.0',
+    version: MCP_CLIENT_VERSION,
   },
   {
     capabilities: {
@@ -30,8 +32,14 @@ const server = new Server(
 );
 
 // Configuration
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'https://mcp.i18nagent.ai';
-const API_KEY = process.env.API_KEY || 'sk-prod-fa6e528114c6136c12fcfcee08bb0f5f0ef7a262cfeb8b151bc44b8996336d53';
+if (!process.env.MCP_SERVER_URL) {
+  throw new Error('MCP_SERVER_URL environment variable is required');
+}
+if (!process.env.API_KEY) {
+  throw new Error('API_KEY environment variable is required');
+}
+const MCP_SERVER_URL = process.env.MCP_SERVER_URL;
+const API_KEY = process.env.API_KEY;
 
 // Available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -39,39 +47,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'translate_text',
-        description: 'Translate text from one language to another with cultural context',
+        description: 'Translate text content with cultural adaptation using AI subagents. For large requests (>100 texts or >50,000 characters), returns a jobId for async processing. Use check_translation_status to monitor progress and download results.',
         inputSchema: {
           type: 'object',
           properties: {
             texts: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Array of texts to translate',
+              description: 'Array of source texts to translate (any language)',
             },
             targetLanguage: {
               type: 'string',
-              description: 'Target language code (e.g., "es", "fr", "ja", "de") or full name (e.g., "Spanish", "French")',
+              description: 'Target language code (e.g., "es", "fr", "zh-CN")',
             },
             sourceLanguage: {
               type: 'string',
-              description: 'Source language code (optional, auto-detected if not provided)',
-              default: 'auto',
+              description: 'Source language code (auto-detected if not provided)',
             },
             targetAudience: {
               type: 'string',
-              description: 'Target audience (e.g., "general", "technical", "casual", "formal")',
-              default: 'general',
+              description: 'Target audience for the content (e.g., "software developers", "marketing professionals")',
             },
             industry: {
               type: 'string',
-              description: 'Industry context (e.g., "technology", "healthcare", "finance", "education")',
-              default: 'technology',
+              description: 'Industry context (e.g., "technology", "healthcare", "finance")',
             },
             region: {
               type: 'string',
               description: 'Specific region for localization (e.g., "Spain", "Mexico", "Brazil")',
             },
-            notes: {
+            context: {
               type: 'string',
               description: 'Optional additional context or instructions for the translation (e.g., "Keep technical terms in English", "Use formal tone")',
             },
@@ -95,7 +100,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'translate_file',
-        description: 'Translate file content while preserving structure and format. Supports JSON, YAML, XML, CSV, TXT, MD, and other text files',
+        description: 'Translate file content while preserving structure and format. Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. For large files (>100KB), returns a jobId for async processing. Use check_translation_status to monitor progress and download results.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -145,7 +150,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Specific region for localization (e.g., "Spain", "Mexico", "Brazil")',
             },
-            notes: {
+            context: {
               type: 'string',
               description: 'Optional additional context or instructions for the translation (e.g., "Keep technical terms in English", "Use formal tone")',
             },
@@ -158,8 +163,53 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         description: 'Get remaining credits for the user and approximate word count available at 0.001 credits per word',
         inputSchema: {
           type: 'object',
-          properties: {},
+          properties: {
+            apiKey: {
+              type: 'string',
+              description: 'API key to get credits for (optional, will use environment variable if not provided)',
+            },
+          },
           required: [],
+        },
+      },
+      /*
+       * ====================================================================
+       * TOKEN USAGE TOOLS - RESTRICTED FROM MCP CLIENT ACCESS
+       * ====================================================================
+       * 
+       * HARD LIMIT POLICY: Token usage analytics tools are NOT available 
+       * through MCP client interfaces for security and privacy reasons.
+       * 
+       * Restricted Tools:
+       * - get_token_usage_stats
+       * - get_token_usage_by_translation  
+       * - get_token_usage_by_api_key
+       * 
+       * These tools contain sensitive usage data and billing information
+       * that should only be accessible through authenticated web interfaces,
+       * not through programmatic MCP access.
+       * 
+       * If you need token usage data, please use:
+       * - Web dashboard at https://app.i18nagent.ai
+       * - Direct API calls with proper authentication
+       * - Admin interfaces (for internal use only)
+       * 
+       * This restriction is enforced at the service level and cannot be
+       * bypassed through client modifications.
+       * ====================================================================
+       */
+      {
+        name: 'check_translation_status',
+        description: 'Check the status and progress of an async translation job. Returns progress percentage, elapsed time, and downloads completed translation results when finished.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            jobId: {
+              type: 'string',
+              description: 'The job ID returned from translate_text (>100 texts or >50,000 chars) or translate_file (>100KB) for async processing',
+            },
+          },
+          required: ['jobId'],
         },
       },
     ],
@@ -184,6 +234,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_credits':
         return await handleGetCredits(args);
       
+      /*
+       * TOKEN USAGE TOOLS - BLOCKED FOR SECURITY
+       * These cases are intentionally removed to prevent access to sensitive analytics data
+       * through MCP interfaces. See tool definition comments above for details.
+       */
+      
+      case 'check_translation_status':
+        return await handleCheckTranslationStatus(args);
+      
       default:
         throw new McpError(
           ErrorCode.MethodNotFound,
@@ -192,15 +251,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   } catch (error) {
     console.error(`Error executing tool ${name}:`, error);
+    
+    // Check if error is about API key or credit issues
+    const errorMsg = error.message || '';
+    const isAuthError = errorMsg.toLowerCase().includes('api key') || 
+                       errorMsg.toLowerCase().includes('api_key') ||
+                       errorMsg.toLowerCase().includes('unauthorized') ||
+                       errorMsg.includes('(401)');
+    const isCreditError = errorMsg.toLowerCase().includes('credit') || 
+                         errorMsg.toLowerCase().includes('quota') ||
+                         errorMsg.toLowerCase().includes('limit exceeded') ||
+                         errorMsg.includes('(402)');
+    
+    let finalErrorMsg = error.message;
+    
+    // Add retry guidance for non-auth/credit errors (only for tools that send content)
+    const contentBasedTools = ['translate_text', 'translate_file'];
+    if (!isAuthError && !isCreditError && contentBasedTools.includes(name)) {
+      finalErrorMsg = `${error.message}. Please retry with smaller chunks or split the content into multiple requests.`;
+    }
+    
     throw new McpError(
       ErrorCode.InternalError,
-      `Tool execution failed: ${error.message}`
+      `Tool execution failed: ${finalErrorMsg}`
     );
   }
 });
 
 async function handleTranslateText(args) {
-  const { texts, targetLanguage, sourceLanguage, targetAudience = 'general', industry = 'technology', region, notes } = args;
+  const { texts, targetLanguage, sourceLanguage, targetAudience = 'general', industry = 'technology', region, context } = args;
   
   if (!texts || !Array.isArray(texts) || texts.length === 0) {
     throw new Error('texts must be a non-empty array');
@@ -214,13 +293,13 @@ async function handleTranslateText(args) {
   const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
   const isLargeRequest = texts.length > 100 || totalChars > 50000;
 
-  // Use MCP JSON-RPC protocol for translate_content
+  // Use MCP JSON-RPC protocol for translate_text
   const mcpRequest = {
     jsonrpc: '2.0',
     id: Date.now(),
     method: 'tools/call',
     params: {
-      name: 'translate_content',
+      name: 'translate_text',
       arguments: {
         apiKey: API_KEY,
         texts: texts,
@@ -229,7 +308,7 @@ async function handleTranslateText(args) {
         targetAudience: targetAudience,
         industry: industry,
         region: region,
-        notes: notes,
+        context: context,
       }
     }
   };
@@ -243,7 +322,19 @@ async function handleTranslateText(args) {
     });
 
     if (response.data.error) {
-      throw new Error(`Translation service error: ${response.data.error.message || response.data.error}`);
+      const errorMsg = response.data.error.message || response.data.error;
+      const isAuthError = errorMsg.toString().toLowerCase().includes('api key') || 
+                         errorMsg.toString().toLowerCase().includes('api_key') ||
+                         errorMsg.toString().toLowerCase().includes('unauthorized');
+      const isCreditError = errorMsg.toString().toLowerCase().includes('credit') || 
+                           errorMsg.toString().toLowerCase().includes('quota') ||
+                           errorMsg.toString().toLowerCase().includes('limit exceeded');
+      
+      let finalErrorMsg = `Translation service error: ${errorMsg}`;
+      if (!isAuthError && !isCreditError) {
+        finalErrorMsg += `. Please retry with a smaller text chunk or split the content into multiple smaller requests.`;
+      }
+      throw new Error(finalErrorMsg);
     }
 
     // Check if we got an async job response
@@ -298,80 +389,168 @@ async function handleTranslateText(args) {
         ]
       };
     }
-    throw new Error(`Translation service unavailable: ${error.message}`);
+    
+    // Handle 401 unauthorized - invalid API key
+    if (error.response?.status === 401) {
+      const authErrorDetails = error.response.data?.message || error.response.data?.result?.content?.[0]?.text || error.message;
+      throw new Error(`❌ Invalid API key (401)\nDetails: ${authErrorDetails}\nPlease check your API key at https://app.i18nagent.ai\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`);
+    }
+    
+    // Handle 402 payment required with user-friendly message
+    if (error.response?.status === 402) {
+      const creditErrorDetails = error.response.data?.message || error.response.data?.result?.content?.[0]?.text || error.message;
+      throw new Error(`⚠️ Insufficient credits (402)\nDetails: ${creditErrorDetails}\nPlease top up at https://app.i18nagent.ai\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`);
+    }
+    
+    // Check if it's a large content issue
+    const totalChars = texts.reduce((sum, text) => sum + text.length, 0);
+    if (error.response?.status === 413 || 
+        (error.response?.status === 503 && totalChars > 50000)) {
+      const sizeErrorDetails = error.response?.data?.message || error.response?.data?.result?.content?.[0]?.text || error.message;
+      const errorMsg = `Content too large (${totalChars} characters, ${texts.length} texts)\nStatus: ${error.response?.status}\nDetails: ${sizeErrorDetails}\n\nPlease break into smaller batches:\n• Split into batches of 50-100 texts\n• Keep total size under 50KB per request\n• Process sequentially to avoid overload\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`;
+      throw new Error(errorMsg);
+    }
+    
+    // Check if it's actually a service unavailable error (only for real infrastructure issues)
+    if (error.code === 'ECONNREFUSED' || 
+        error.code === 'ETIMEDOUT' || 
+        error.code === 'ENOTFOUND' ||
+        (error.response?.status === 503 && totalChars <= 50000) ||
+        error.response?.status === 502 ||
+        error.response?.status === 504) {
+      const serviceErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
+                                  error.response?.data?.error?.message || 
+                                  error.message;
+      const debugInfo = `Code: ${error.code || 'N/A'}\nStatus: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${serviceErrorDetails}\nURL: ${error.config?.url || 'N/A'}\nTimestamp: ${new Date().toISOString()}`;
+      throw new Error(`Translation service error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`);
+    }
+    
+    // For other errors, include all debug info in the error message
+    const generalErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
+                               error.response?.data?.error?.message || 
+                               error.message;
+    const debugInfo = `Status: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${generalErrorDetails}\nTimestamp: ${new Date().toISOString()}`;
+    throw new Error(`Error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`);
   }
 }
 
 async function handleListLanguages(args) {
   const { includeQuality = true } = args;
   
-  // Language support matrix based on GPT-OSS analysis
-  const languages = {
-    'Tier 1 - Production Ready (Excellent Quality 80-90%)': {
-      'en': 'English',
-      'es': 'Spanish', 
-      'fr': 'French',
-      'de': 'German',
-      'it': 'Italian',
-      'pt': 'Portuguese',
-      'nl': 'Dutch',
-    },
-    'Tier 2 - Production Viable (Good Quality 50-75%)': {
-      'ru': 'Russian',
-      'zh-CN': 'Chinese (Simplified)',
-      'ja': 'Japanese',
-      'ko': 'Korean',
-      'ar': 'Arabic',
-      'he': 'Hebrew',
-      'hi': 'Hindi',
-      'pl': 'Polish',
-      'cs': 'Czech',
-    },
-    'Tier 3 - Basic Support (Use with Caution 20-50%)': {
-      'zh-TW': 'Chinese (Traditional)',
-      'th': 'Thai',
-      'vi': 'Vietnamese',
-      'sv': 'Swedish',
-      'da': 'Danish',
-      'no': 'Norwegian',
-      'fi': 'Finnish',
-      'tr': 'Turkish',
-      'hu': 'Hungarian',
-    },
+  // Use MCP JSON-RPC protocol for list_supported_languages
+  const mcpRequest = {
+    jsonrpc: '2.0',
+    id: Date.now(),
+    method: 'tools/call',
+    params: {
+      name: 'list_supported_languages',
+      arguments: { includeQuality }
+    }
   };
-
-  let content = '🌍 Supported Languages\n';
-  content += '===================\n\n';
   
-  if (includeQuality) {
-    for (const [tier, langs] of Object.entries(languages)) {
-      content += `## ${tier}\n`;
-      for (const [code, name] of Object.entries(langs)) {
-        content += `- \`${code}\`: ${name}\n`;
-      }
-      content += '\n';
-    }
-  } else {
-    const allLanguages = Object.values(languages).reduce((acc, tier) => ({ ...acc, ...tier }), {});
-    for (const [code, name] of Object.entries(allLanguages)) {
-      content += `- \`${code}\`: ${name}\n`;
-    }
-  }
-
-  content += '\n💡 Usage Tips:\n';
-  content += '- Use language codes (e.g., "es") or full names (e.g., "Spanish")\n';
-  content += '- Tier 1 languages are recommended for production use\n';
-  content += '- Tier 2 languages work well with human review\n';
-  content += '- Tier 3 languages provide basic translation quality\n';
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: content,
+  try {
+    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
+      headers: {
+        'Content-Type': 'application/json',
       },
-    ],
-  };
+      timeout: 30000,
+    });
+
+    if (response.data.error) {
+      const errorMsg = response.data.error.message || response.data.error;
+      throw new Error(`Languages service error: ${errorMsg}`);
+    }
+
+    const result = response.data.result;
+    if (result && result.content && result.content[0]) {
+      const textContent = result.content[0].text;
+      
+      // Try to parse as JSON for structured data
+      try {
+        const parsed = JSON.parse(textContent);
+        
+        // Format the language data nicely
+        let content = '🌍 Supported Languages\n';
+        content += '===================\n\n';
+        
+        if (parsed.languages && Array.isArray(parsed.languages)) {
+          if (includeQuality) {
+            // Group by quality levels
+            const highQuality = parsed.languages.filter(lang => lang.quality === 'high');
+            const mediumQuality = parsed.languages.filter(lang => lang.quality === 'medium');
+            
+            if (highQuality.length > 0) {
+              content += '## High Quality (Recommended for Production)\n';
+              highQuality.forEach(lang => {
+                content += `- \`${lang.code}\`: ${lang.name}\n`;
+              });
+              content += '\n';
+            }
+            
+            if (mediumQuality.length > 0) {
+              content += '## Medium Quality (Good with Review)\n';
+              mediumQuality.forEach(lang => {
+                content += `- \`${lang.code}\`: ${lang.name}\n`;
+              });
+              content += '\n';
+            }
+          } else {
+            parsed.languages.forEach(lang => {
+              content += `- \`${lang.code}\`: ${lang.name}\n`;
+            });
+            content += '\n';
+          }
+          
+          content += `📊 **Total Languages**: ${parsed.total || parsed.languages.length}\n\n`;
+          
+          if (parsed.qualityLevels) {
+            content += `Quality Breakdown:\n`;
+            content += `• High Quality: ${parsed.qualityLevels.high} languages\n`;
+            content += `• Medium Quality: ${parsed.qualityLevels.medium} languages\n\n`;
+          }
+        }
+        
+        content += '💡 Usage Tips:\n';
+        content += '- Use language codes (e.g., "es") or full names (e.g., "Spanish")\n';
+        content += '- High quality languages are recommended for production use\n';
+        content += '- Medium quality languages work well with human review\n';
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: content,
+            },
+          ],
+        };
+      } catch {
+        // Return raw text if not JSON
+        return result;
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('List languages error:', error);
+    
+    // Fallback to basic language list if service is unavailable
+    const fallbackContent = `🌍 Supported Languages (Fallback)\n` +
+      `==================================\n\n` +
+      `Service temporarily unavailable. Here are the main supported languages:\n\n` +
+      `• \`es\`: Spanish\n• \`fr\`: French\n• \`de\`: German\n• \`it\`: Italian\n` +
+      `• \`pt\`: Portuguese\n• \`ja\`: Japanese\n• \`ko\`: Korean\n• \`zh\`: Chinese\n` +
+      `• \`ru\`: Russian\n• \`ar\`: Arabic\n• \`hi\`: Hindi\n• \`nl\`: Dutch\n\n` +
+      `Error: ${error.message}`;
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: fallbackContent,
+        },
+      ],
+    };
+  }
 }
 
 async function handleTranslateFile(args) {
@@ -386,7 +565,7 @@ async function handleTranslateFile(args) {
     outputFormat = 'same',
     sourceLanguage,
     region,
-    notes
+    context
   } = args;
   
   if (!filePath && !fileContent) {
@@ -428,7 +607,7 @@ async function handleTranslateFile(args) {
         targetAudience,
         industry,
         region,
-        notes,
+        context,
         preserveKeys,
         outputFormat
       }
@@ -444,7 +623,19 @@ async function handleTranslateFile(args) {
     });
 
     if (response.data.error) {
-      throw new Error(`Translation service error: ${response.data.error.message || response.data.error}`);
+      const errorMsg = response.data.error.message || response.data.error;
+      const isAuthError = errorMsg.toString().toLowerCase().includes('api key') || 
+                         errorMsg.toString().toLowerCase().includes('api_key') ||
+                         errorMsg.toString().toLowerCase().includes('unauthorized');
+      const isCreditError = errorMsg.toString().toLowerCase().includes('credit') || 
+                           errorMsg.toString().toLowerCase().includes('quota') ||
+                           errorMsg.toString().toLowerCase().includes('limit exceeded');
+      
+      let finalErrorMsg = `Translation service error: ${errorMsg}`;
+      if (!isAuthError && !isCreditError) {
+        finalErrorMsg += `. Please retry with a smaller text chunk or split the content into multiple smaller requests.`;
+      }
+      throw new Error(finalErrorMsg);
     }
 
     // Check if we got an async job response
@@ -468,6 +659,8 @@ async function handleTranslateFile(args) {
     return result;
     
   } catch (error) {
+    // Debug info will be included in error messages for visibility
+    
     if (error.code === 'ECONNABORTED') {
       return {
         content: [
@@ -489,7 +682,51 @@ async function handleTranslateFile(args) {
         ]
       };
     }
-    throw new Error(`Translation service unavailable: ${error.message}`);
+    
+    // Handle 401 unauthorized - invalid API key
+    if (error.response?.status === 401) {
+      const fileAuthErrorDetails = error.response.data?.message || error.response.data?.result?.content?.[0]?.text || error.message;
+      throw new Error(`❌ Invalid API key (401)\nDetails: ${fileAuthErrorDetails}\nPlease check your API key at https://app.i18nagent.ai\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`);
+    }
+    
+    // Handle 402 payment required with user-friendly message
+    if (error.response?.status === 402) {
+      const fileCreditErrorDetails = error.response.data?.message || error.response.data?.result?.content?.[0]?.text || error.message;
+      throw new Error(`⚠️ Insufficient credits (402)\nDetails: ${fileCreditErrorDetails}\nPlease top up at https://app.i18nagent.ai\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`);
+    }
+    
+    // Check if it's a timeout issue (45-second server timeout) or large file issue
+    const timeoutErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
+                               error.response?.data?.error?.message || 
+                               error.message;
+    
+    if (error.response?.status === 413 || 
+        (error.response?.status === 503 && content.length > 50000) ||
+        (error.response?.status === 503 && timeoutErrorDetails.includes('timeout after 45 seconds'))) {
+      const errorMsg = `File too large or complex (${content.length} characters)\n\nThe server has a 45-second timeout. Your file requires more processing time.\n\nPlease break into smaller chunks:\n• Split files over 50KB into multiple parts\n• Translate sections separately (e.g., split by top-level keys for JSON)\n• Use translate_text for batches of 50-100 strings\n• Each chunk should process in under 45 seconds\n\nAlternatively, wait for async job support (coming soon).\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`;
+      throw new Error(errorMsg);
+    }
+    
+    // Check if it's actually a service unavailable error (only for real infrastructure issues)
+    if (error.code === 'ECONNREFUSED' || 
+        error.code === 'ETIMEDOUT' || 
+        error.code === 'ENOTFOUND' ||
+        (error.response?.status === 503 && content.length <= 50000) ||
+        error.response?.status === 502 ||
+        error.response?.status === 504) {
+      const serviceErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
+                                  error.response?.data?.error?.message || 
+                                  error.message;
+      const debugInfo = `Code: ${error.code || 'N/A'}\nStatus: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${serviceErrorDetails}\nURL: ${error.config?.url || 'N/A'}\nTimestamp: ${new Date().toISOString()}`;
+      throw new Error(`Translation service error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`);
+    }
+    
+    // For other errors, include all debug info in the error message
+    const finalErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
+                              error.response?.data?.error?.message || 
+                              error.message;
+    const debugInfo = `Status: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${finalErrorDetails}\nTimestamp: ${new Date().toISOString()}`;
+    throw new Error(`Error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`);
   }
 }
 
@@ -541,7 +778,19 @@ async function pollTranslationJob(jobId, estimatedTime) {
       });
       
       if (response.data.error) {
-        throw new Error(`Status check error: ${response.data.error.message || response.data.error}`);
+        const errorMsg = response.data.error.message || response.data.error;
+        const isAuthError = errorMsg.toString().toLowerCase().includes('api key') || 
+                           errorMsg.toString().toLowerCase().includes('api_key') ||
+                           errorMsg.toString().toLowerCase().includes('unauthorized');
+        const isCreditError = errorMsg.toString().toLowerCase().includes('credit') || 
+                             errorMsg.toString().toLowerCase().includes('quota') ||
+                             errorMsg.toString().toLowerCase().includes('limit exceeded');
+        
+        let finalErrorMsg = `Status check error: ${errorMsg}`;
+        if (!isAuthError && !isCreditError) {
+          finalErrorMsg += `. Please retry with a smaller chunk or split the content into multiple requests.`;
+        }
+        throw new Error(finalErrorMsg);
       }
       
       const result = response.data.result;
@@ -551,7 +800,19 @@ async function pollTranslationJob(jobId, estimatedTime) {
         if (status.status === 'completed') {
           return status.result;
         } else if (status.status === 'failed') {
-          throw new Error(`Translation failed: ${status.error}`);
+          const errorMsg = status.error;
+          const isAuthError = errorMsg.toString().toLowerCase().includes('api key') || 
+                             errorMsg.toString().toLowerCase().includes('api_key') ||
+                             errorMsg.toString().toLowerCase().includes('unauthorized');
+          const isCreditError = errorMsg.toString().toLowerCase().includes('credit') || 
+                               errorMsg.toString().toLowerCase().includes('quota') ||
+                               errorMsg.toString().toLowerCase().includes('limit exceeded');
+          
+          let finalErrorMsg = `Translation failed: ${errorMsg}`;
+          if (!isAuthError && !isCreditError) {
+            finalErrorMsg += `. Please retry with a smaller chunk or split the content into multiple requests.`;
+          }
+          throw new Error(finalErrorMsg);
         }
         
         // Still processing - continue polling
@@ -563,48 +824,86 @@ async function pollTranslationJob(jobId, estimatedTime) {
     }
   }
   
-  throw new Error(`Translation job ${jobId} timed out after ${maxPolls * pollInterval / 1000} seconds`);
+  throw new Error(`Translation job ${jobId} timed out after ${maxPolls * pollInterval / 1000} seconds. Please retry with a smaller chunk or split the content into multiple requests.`);
 }
 
 async function handleGetCredits(args) {
-  try {
-    const response = await axios.post(`${MCP_SERVER_URL}/api/mcp`, {
+  const { apiKey } = args;
+  const creditsApiKey = apiKey || API_KEY;
+  
+  // Use MCP JSON-RPC protocol for get_credits
+  const mcpRequest = {
+    jsonrpc: '2.0',
+    id: Date.now(),
+    method: 'tools/call',
+    params: {
       name: 'get_credits',
       arguments: {
-        apiKey: API_KEY,
+        apiKey: creditsApiKey
       }
-    }, {
+    }
+  };
+  
+  try {
+    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      timeout: 10000
+      timeout: 30000,
     });
 
-    const result = response.data;
-    
-    if (result.isError) {
-      throw new Error(result.content[0].text);
+    if (response.data.error) {
+      const errorMsg = response.data.error.message || response.data.error;
+      const isAuthError = errorMsg.toString().toLowerCase().includes('api key') || 
+                         errorMsg.toString().toLowerCase().includes('api_key') ||
+                         errorMsg.toString().toLowerCase().includes('unauthorized');
+      const isCreditError = errorMsg.toString().toLowerCase().includes('credit') || 
+                           errorMsg.toString().toLowerCase().includes('quota') ||
+                           errorMsg.toString().toLowerCase().includes('limit exceeded');
+      
+      let finalErrorMsg = `Credits service error: ${errorMsg}`;
+      if (!isAuthError && !isCreditError) {
+        finalErrorMsg += `. Please check the service status or contact support.`;
+      }
+      throw new Error(finalErrorMsg);
     }
 
-    const creditsInfo = JSON.parse(result.content[0].text);
+    const result = response.data.result;
+    if (result && result.content && result.content[0]) {
+      const textContent = result.content[0].text;
+      
+      // Try to parse as JSON for structured data
+      try {
+        const parsed = JSON.parse(textContent);
+        const approximateWordsAvailable = parsed.credits ? Math.floor(parsed.credits * 1000) : 0;
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `💰 **Credits Information**\n\n` +
+                    `💳 **Credits Remaining**: ${parsed.credits || 'N/A'}\n` +
+                    `📝 **Approximate Words Available**: ${approximateWordsAvailable.toLocaleString()}\n` +
+                    `💵 **Cost per Word**: 0.001 credits\n` +
+                    `⏰ **Last Updated**: ${new Date().toLocaleString()}\n\n` +
+                    `Note: Word count is approximate and may vary based on actual content complexity and translation requirements.`,
+            },
+          ],
+        };
+      } catch {
+        // Return raw text if not JSON
+        return result;
+      }
+    }
     
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `💰 **Credits Information**
-
-🏢 **Team**: ${creditsInfo.teamName}
-💳 **Credits Remaining**: ${creditsInfo.creditsRemaining}
-📝 **Approximate Words Available**: ${creditsInfo.approximateWordsAvailable.toLocaleString()}
-💵 **Cost per Word**: ${creditsInfo.costPerWord} credits
-⏰ **Last Updated**: ${new Date(creditsInfo.timestamp).toLocaleString()}
-
-Note: Word count is approximate and may vary based on actual content complexity and translation requirements.`,
-        },
-      ],
-    };
+    return result;
   } catch (error) {
+    // Handle 401 unauthorized
+    if (error.response?.status === 401) {
+      const creditsAuthErrorDetails = error.response.data?.message || error.response.data?.result?.content?.[0]?.text || error.message;
+      throw new Error(`❌ Invalid API key (401)\nDetails: ${creditsAuthErrorDetails}\nPlease check your API key at https://app.i18nagent.ai\n[MCP v${MCP_CLIENT_VERSION}/STDIO/get_credits]`);
+    }
+    
     console.error('Credits check error:', error);
     throw new Error(`Unable to check credits: ${error.message}`);
   }
@@ -935,6 +1234,89 @@ function getCodeBlockLanguage(fileType) {
     'txt': 'text'
   };
   return languageMap[fileType] || 'text';
+}
+
+/*
+ * =====================================================================
+ * TOKEN USAGE HANDLERS - INTENTIONALLY REMOVED FOR SECURITY
+ * =====================================================================
+ * 
+ * The following handler functions have been permanently removed from 
+ * the MCP client to prevent unauthorized access to sensitive analytics:
+ * 
+ * - handleGetTokenUsageStats()
+ * - handleGetTokenUsageByTranslation() 
+ * - handleGetTokenUsageByApiKey()
+ * 
+ * SECURITY RATIONALE:
+ * Token usage data contains sensitive billing and usage information
+ * that should not be accessible through programmatic MCP clients.
+ * This data includes:
+ * - Detailed usage patterns and costs
+ * - API key performance metrics
+ * - Translation volume analytics
+ * - Billing-related information
+ * 
+ * ACCESS ALTERNATIVES:
+ * - Use the web dashboard at https://app.i18nagent.ai
+ * - Contact support for usage reports
+ * - Use admin interfaces (internal only)
+ * 
+ * This restriction is enforced as a hard security boundary and 
+ * cannot be bypassed through client modifications.
+ * =====================================================================
+ */
+
+// Handler for checking translation status
+async function handleCheckTranslationStatus(args) {
+  const { jobId } = args;
+  
+  if (!jobId) {
+    throw new Error('jobId is required');
+  }
+  
+  const mcpRequest = {
+    jsonrpc: '2.0',
+    id: Date.now(),
+    method: 'tools/call',
+    params: {
+      name: 'check_translation_status',
+      arguments: { jobId }
+    }
+  };
+  
+  try {
+    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000
+    });
+    
+    if (response.data.error) {
+      throw new Error(`Translation status error: ${response.data.error.message || response.data.error}`);
+    }
+    
+    return response.data.result;
+  } catch (error) {
+    console.error('Check translation status error:', error);
+    
+    // Handle 503 service unavailable
+    if (error.response?.status === 503) {
+      throw new Error(`Translation service is temporarily unavailable (503). Please try again in a few moments.`);
+    }
+    
+    // Handle 404 not found
+    if (error.response?.status === 404) {
+      throw new Error(`Translation job ${jobId} not found. The job may have expired or the ID is incorrect.`);
+    }
+    
+    // Handle timeout
+    if (error.code === 'ECONNABORTED') {
+      throw new Error(`Status check timed out. The service may be experiencing high load. Please try again.`);
+    }
+    
+    // Generic error
+    throw new Error(`Unable to check translation status: ${error.message}`);
+  }
 }
 
 // Start the server

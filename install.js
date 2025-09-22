@@ -74,6 +74,45 @@ function createMCPConfig() {
   };
 }
 
+function detectNodeEnvironment() {
+  // Check if using nvm or other version managers
+  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), '.nvm');
+  const nodeVersion = process.version;
+  const nodePath = process.execPath;
+  
+  return {
+    isNvm: nodePath.includes('.nvm') || nodePath.includes('nvm'),
+    nodePath,
+    nodeVersion
+  };
+}
+
+function createWrapperScript(targetDir) {
+  const nodeEnv = detectNodeEnvironment();
+  const wrapperPath = path.join(targetDir, 'run-mcp.sh');
+  const mcpClientPath = path.join(targetDir, 'node_modules', '@i18n-agent', 'mcp-client', 'mcp-client.js');
+  
+  let wrapperContent;
+  
+  if (nodeEnv.isNvm) {
+    // For nvm users, we need to set up the PATH properly
+    wrapperContent = `#!/bin/bash
+# Wrapper script for i18n-agent MCP client (handles nvm environments)
+export PATH="${path.dirname(nodeEnv.nodePath)}:$PATH"
+cd "${targetDir}"
+exec node "${mcpClientPath}"`;
+  } else {
+    // For system node installations
+    wrapperContent = `#!/bin/bash
+# Wrapper script for i18n-agent MCP client
+cd "${targetDir}"
+exec node "${mcpClientPath}"`;
+  }
+  
+  fs.writeFileSync(wrapperPath, wrapperContent, { mode: 0o755 });
+  return wrapperPath;
+}
+
 function updateClaudeConfig(configPath) {
   let config = {};
   
@@ -92,16 +131,36 @@ function updateClaudeConfig(configPath) {
     config.mcpServers = {};
   }
   
-  // Add i18n-agent configuration
-  const mcpClientPath = path.resolve(__dirname, 'mcp-client.js');
-  config.mcpServers["i18n-agent"] = {
-    command: "node",
-    args: [mcpClientPath],
-    env: {
-      MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-      API_KEY: ""
-    }
-  };
+  // Detect if we need a wrapper script (for nvm users)
+  const nodeEnv = detectNodeEnvironment();
+  const claudeDir = path.join(os.homedir(), '.claude');
+  
+  if (nodeEnv.isNvm) {
+    // Create wrapper script for nvm users
+    console.log('   🔧 Detected nvm environment, creating wrapper script...');
+    const wrapperPath = createWrapperScript(claudeDir);
+    
+    config.mcpServers["i18n-agent"] = {
+      command: wrapperPath,
+      env: {
+        MCP_SERVER_URL: "https://mcp.i18nagent.ai",
+        API_KEY: ""
+      }
+    };
+  } else {
+    // Standard configuration for system node
+    const mcpClientPath = path.join(claudeDir, 'node_modules', '@i18n-agent', 'mcp-client', 'mcp-client.js');
+    
+    config.mcpServers["i18n-agent"] = {
+      command: "node",
+      args: [mcpClientPath],
+      cwd: claudeDir,
+      env: {
+        MCP_SERVER_URL: "https://mcp.i18nagent.ai",
+        API_KEY: ""
+      }
+    };
+  }
   
   // Write updated config
   fs.mkdirSync(path.dirname(configPath), { recursive: true });

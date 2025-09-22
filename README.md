@@ -69,6 +69,11 @@ Check my translation credits
 List supported languages with quality ratings
 ```
 
+### Content Analysis
+```
+Analyze content for translation readiness and get improvement suggestions
+```
+
 ## 🛠 Supported AI IDEs
 
 | IDE | Status | Config Location |
@@ -79,8 +84,6 @@ List supported languages with quality ratings
 | **Other MCP IDEs** | 🔧 Manual setup | Varies |
 
 ## 🌐 Language Support
-
-### Tier 1 - Excellent Quality
 - **en**: English
 - **fr**: French
 - **de**: German
@@ -91,8 +94,6 @@ List supported languages with quality ratings
 - **ja**: Japanese
 - **ko**: Korean
 - **zh-CN**: Chinese (Simplified)
-
-### Tier 2 - High Quality
 - **nl**: Dutch
 - **pl**: Polish
 - **cs**: Czech
@@ -104,8 +105,6 @@ List supported languages with quality ratings
 - **da**: Danish
 - **no**: Norwegian
 - **fi**: Finnish
-
-### Tier 3 - Good Quality
 - **tr**: Turkish
 - **hu**: Hungarian
 - **th**: Thai
@@ -216,6 +215,50 @@ ls ~/.cursor/
 ls ~/.vscode/
 ```
 
+### MCP Connection Issues
+
+**"Failed" status in Claude Code:**
+
+This usually happens with Node Version Managers (nvm, fnm, n). The installer now automatically detects nvm and creates a wrapper script. If you still have issues:
+
+1. **Check your Node installation:**
+   ```bash
+   which node
+   # If output contains .nvm, you're using nvm
+   ```
+
+2. **Manual wrapper script (if auto-detection fails):**
+   Create `~/.claude/run-mcp.sh`:
+   ```bash
+   #!/bin/bash
+   export PATH="$(dirname $(which node)):$PATH"
+   cd ~/.claude
+   exec node node_modules/@i18n-agent/mcp-client/mcp-client.js
+   ```
+   
+   Make it executable:
+   ```bash
+   chmod +x ~/.claude/run-mcp.sh
+   ```
+   
+3. **Update Claude configuration:**
+   Edit `~/.claude.json`:
+   ```json
+   {
+     "mcpServers": {
+       "i18n-agent": {
+         "command": "/Users/YOUR_USERNAME/.claude/run-mcp.sh",
+         "env": {
+           "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
+           "API_KEY": "your-api-key"
+         }
+       }
+     }
+   }
+   ```
+
+4. **Restart Claude Code completely** (not just close window, quit the app)
+
 ### Runtime Issues
 
 **API Key not found:**
@@ -277,9 +320,70 @@ Copyright (c) 2025 FatCouple OÜ
 
 ## 🆘 Support
 
-- **Discord**: [Join our community](https://discord.gg/i18nagent)
 - **Email**: support@i18nagent.ai
 - **Documentation**: [docs.i18nagent.ai](https://docs.i18nagent.ai)
+
+## 🔧 Available MCP Tools
+
+### translate_text
+Translate text content with cultural adaptation and context awareness.
+
+**Parameters:**
+- `texts` (array): Array of strings to translate
+- `targetLanguage` (string): Target language code
+- `targetAudience` (string): Target audience context
+- `industry` (string): Industry context
+- `sourceLanguage` (string, optional): Source language (auto-detected if not provided)
+- `region` (string, optional): Specific region for localization
+
+### translate_file
+Translate files while preserving structure and format.
+
+**Parameters:**
+- `filePath` or `fileContent` (string): File path or content to translate
+- `fileType` (string): File format (json, yaml, xml, csv, txt, md, etc.)
+- `targetLanguage` (string): Target language code
+- `preserveKeys` (boolean): Whether to preserve object keys/structure
+- `outputFormat` (string): Output format (same, json, yaml, txt)
+
+### analyze_content
+Analyze content for translation readiness and get improvement suggestions before translation.
+
+**Parameters:**
+- `content` (string/array/object): Content to analyze
+- `targetLanguage` (string): Target language for translation
+- `fileType` (string, optional): File type if content is from a file
+- `sourceLanguage` (string, optional): Source language (auto-detected)
+- `industry` (string): Industry context
+- `targetAudience` (string): Target audience
+- `region` (string, optional): Specific region for localization
+
+**Returns:**
+- Source language detection with confidence score
+- Content type and tone analysis
+- Translation readiness score (0-100)
+- Specific improvement suggestions
+- Quality metrics and issues
+- Warnings for potential problems
+- Estimated credits required
+
+### list_supported_languages
+Get list of all supported languages with quality ratings.
+
+**Parameters:**
+- `includeQuality` (boolean): Include quality ratings (default: true)
+
+### get_credits
+Check remaining translation credits and word count estimates.
+
+**Parameters:**
+- `apiKey` (string): Your API key
+
+### check_translation_status
+Check status of async translation jobs (for large files).
+
+**Parameters:**
+- `jobId` (string): Job ID from async translation
 
 ---
 
