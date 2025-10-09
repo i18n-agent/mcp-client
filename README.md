@@ -13,7 +13,7 @@ Professional translation service client for Claude, Cursor, VS Code, and other A
 - **🔄 Timeout Improvements**: Extended timeouts (5-10 min) for large translations
 - **📊 Progress Tracking**: Real-time job status and completion monitoring
 - **💰 Credit Tracking**: Real-time credit balance and word count estimates
-- **🌐 30+ Languages**: Multi-tier language support with quality ratings
+- **🌐 48 Languages**: Comprehensive language support with regional variants
 - **🔧 Easy Setup**: One-command installation for major AI IDEs
 
 ## 🚀 Quick Installation
@@ -71,53 +71,69 @@ List supported languages with quality ratings
 
 ### Content Analysis
 ```
-Analyze content for translation readiness and get improvement suggestions
+Analyze "Hello world! This is a test." for translation to Spanish
 ```
 
 ## 🛠 Supported AI IDEs
 
-| IDE | Status | Config Location |
-|-----|--------|----------------|
-| **Claude Desktop** | ✅ Auto-configured | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| **Cursor** | ✅ Auto-configured | `~/.cursor/mcp_settings.json` |
-| **VS Code** | ✅ Auto-configured | `~/.vscode/mcp_settings.json` |
-| **Other MCP IDEs** | 🔧 Manual setup | Varies |
+| IDE | Status | macOS | Windows | Linux |
+|-----|--------|-------|---------|-------|
+| **Claude Desktop** | ✅ Auto-configured | `~/Library/Application Support/Claude/` | `%APPDATA%\Claude\` | `~/.config/Claude/` |
+| **Claude Code CLI** | ✅ Auto-configured | `~/.claude.json` | `~/.claude.json` | `~/.claude.json` |
+| **Cursor** | ✅ Auto-configured | `~/.cursor/mcp_settings.json` | `~/.cursor/mcp_settings.json` | `~/.cursor/mcp_settings.json` |
+| **VS Code** | ✅ Auto-configured | `~/.vscode/mcp_settings.json` | `~/.vscode/mcp_settings.json` | `~/.vscode/mcp_settings.json` |
+| **Codex (OpenAI)** | ✅ Auto-configured | `~/.codex/mcp_settings.json` | `~/.codex/mcp_settings.json` | `~/.codex/mcp_settings.json` |
 
-## 🌐 Language Support
-- **en**: English
-- **fr**: French
+**Note:** The installer automatically detects your platform and uses the correct config paths.
+
+## 🌐 Language Support (48 Languages)
+- **bg**: Bulgarian
+- **ca**: Catalan
+- **cs**: Czech
+- **da**: Danish
 - **de**: German
+- **el**: Greek
+- **en**: English
+- **en-AU**: English (Australia)
+- **en-CA**: English (Canada)
+- **en-GB**: English (United Kingdom)
+- **en-US**: English (United States)
 - **es**: Spanish
+- **es-MX**: Spanish (Mexico)
+- **et**: Estonian
+- **fi**: Finnish
+- **fr**: French
+- **fr-CA**: French (Canada)
+- **hi**: Hindi
+- **hr**: Croatian
+- **hu**: Hungarian
+- **id**: Indonesian
+- **is**: Icelandic
 - **it**: Italian
-- **pt**: Portuguese
-- **ru**: Russian
 - **ja**: Japanese
 - **ko**: Korean
-- **zh-CN**: Chinese (Simplified)
+- **lt**: Lithuanian
+- **lv**: Latvian
+- **ms**: Malay
 - **nl**: Dutch
-- **pl**: Polish
-- **cs**: Czech
-- **ar**: Arabic
-- **he**: Hebrew
-- **hi**: Hindi
-- **zh-TW**: Chinese (Traditional)
-- **sv**: Swedish
-- **da**: Danish
 - **no**: Norwegian
-- **fi**: Finnish
-- **tr**: Turkish
-- **hu**: Hungarian
-- **th**: Thai
-- **vi**: Vietnamese
-- **uk**: Ukrainian
-- **bg**: Bulgarian
+- **pl**: Polish
+- **pt**: Portuguese
+- **pt-BR**: Portuguese (Brazil)
 - **ro**: Romanian
-- **hr**: Croatian
+- **ru**: Russian
 - **sk**: Slovak
 - **sl**: Slovenian
-- **et**: Estonian
-- **lv**: Latvian
-- **lt**: Lithuanian
+- **sr**: Serbian
+- **sv**: Swedish
+- **th**: Thai
+- **tl**: Filipino
+- **tr**: Turkish
+- **uk**: Ukrainian
+- **vi**: Vietnamese
+- **zh-Hans**: Chinese (Simplified)
+- **zh-Hant-HK**: Chinese (Traditional, Hong Kong)
+- **zh-Hant-TW**: Chinese (Traditional, Taiwan)
 
 ## 📁 Supported File Formats
 
@@ -128,8 +144,11 @@ Analyze content for translation readiness and get improvement suggestions
 | CSV | `.csv` | Handles quoted fields, commas |
 | XML/HTML | `.xml`, `.html` | Extracts text content |
 | Markdown | `.md` | Preserves formatting, skips code |
-| Properties | `.properties` | Key-value pairs |
+| Properties | `.properties` | Java properties key-value pairs |
 | Plain Text | `.txt` | Direct translation |
+| PDF | `.pdf` | Text extraction and translation |
+| Word | `.docx`, `.doc` | Document translation |
+| Gettext | `.po`, `.pot`, `.mo` | Localization file formats |
 
 ## 🔧 Manual Setup
 
@@ -347,7 +366,7 @@ Translate files while preserving structure and format.
 - `outputFormat` (string): Output format (same, json, yaml, txt)
 
 ### analyze_content
-Analyze content for translation readiness and get improvement suggestions before translation.
+Analyze content for translation readiness and get improvement suggestions before translation. This helps identify potential issues and optimize content before spending credits on translation.
 
 **Parameters:**
 - `content` (string/array/object): Content to analyze
