@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.8.1';
+const MCP_CLIENT_VERSION = '1.8.2';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -334,26 +334,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   } catch (error) {
     console.error(`Error executing tool ${name}:`, error);
-    
+
     // Check if error is about API key or credit issues
     const errorMsg = error.message || '';
-    const isAuthError = errorMsg.toLowerCase().includes('api key') || 
+    const isAuthError = errorMsg.toLowerCase().includes('api key') ||
                        errorMsg.toLowerCase().includes('api_key') ||
                        errorMsg.toLowerCase().includes('unauthorized') ||
                        errorMsg.includes('(401)');
-    const isCreditError = errorMsg.toLowerCase().includes('credit') || 
+    const isCreditError = errorMsg.toLowerCase().includes('credit') ||
                          errorMsg.toLowerCase().includes('quota') ||
                          errorMsg.toLowerCase().includes('limit exceeded') ||
                          errorMsg.includes('(402)');
-    
+
+    // Check if error is already descriptive (validation errors, specific errors with clear messages)
+    const hasDescriptiveError = errorMsg.includes('Invalid language code') ||
+                               errorMsg.includes('is a multilingual region') ||
+                               errorMsg.includes('not found') ||
+                               errorMsg.includes('timed out') ||
+                               errorMsg.includes('Timeout') ||
+                               errorMsg.includes('Required') ||
+                               errorMsg.includes('must be') ||
+                               errorMsg.includes('is required') ||
+                               errorMsg.length > 200; // Long errors are likely already detailed
+
     let finalErrorMsg = error.message;
-    
-    // Add retry guidance for non-auth/credit errors (only for tools that send content)
+
+    // Only add retry guidance if:
+    // 1. It's not an auth/credit error
+    // 2. It's a content-based tool
+    // 3. The error is NOT already descriptive
     const contentBasedTools = ['translate_text', 'translate_file'];
-    if (!isAuthError && !isCreditError && contentBasedTools.includes(name)) {
+    if (!isAuthError && !isCreditError && !hasDescriptiveError && contentBasedTools.includes(name)) {
       finalErrorMsg = `${error.message}. Please retry with smaller chunks or split the content into multiple requests.`;
     }
-    
+
     throw new McpError(
       ErrorCode.InternalError,
       `Tool execution failed: ${finalErrorMsg}`
