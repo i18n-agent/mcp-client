@@ -197,26 +197,33 @@ exec node "${mcpClientPath}"`;
 
 function updateClaudeConfig(configPath) {
   let config = {};
-  
+  let existingApiKey = "";
+
   // Read existing config if it exists
   if (fs.existsSync(configPath)) {
     try {
       const content = fs.readFileSync(configPath, 'utf8');
       config = JSON.parse(content);
+
+      // Preserve existing API key if present
+      if (config.mcpServers?.["i18n-agent"]?.env?.API_KEY) {
+        existingApiKey = config.mcpServers["i18n-agent"].env.API_KEY;
+        console.log('   🔑 Preserving existing API key');
+      }
     } catch (error) {
       console.warn(`Warning: Could not parse existing config at ${configPath}`);
     }
   }
-  
+
   // Ensure mcpServers exists
   if (!config.mcpServers) {
     config.mcpServers = {};
   }
-  
+
   // Detect if we need a wrapper script (for nvm users)
   const nodeEnv = detectNodeEnvironment();
   const claudeDir = path.join(os.homedir(), '.claude');
-  
+
   if (nodeEnv.isNvm) {
     // Create wrapper script for nvm users
     console.log('   🔧 Detected nvm environment, creating wrapper script...');
@@ -226,29 +233,40 @@ function updateClaudeConfig(configPath) {
       command: wrapperPath,
       env: {
         MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-        API_KEY: ""
+        API_KEY: existingApiKey || ""
       }
     };
   } else {
     // Standard configuration for system node
     const baseConfig = createMCPConfig();
     config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
+    // Preserve existing API key
+    if (existingApiKey) {
+      config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+    }
   }
-  
+
   // Write updated config
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  
+
   return config;
 }
 
 function updateGenericMCPConfig(configPath) {
   let config = {};
+  let existingApiKey = "";
 
   if (fs.existsSync(configPath)) {
     try {
       const existing = fs.readFileSync(configPath, 'utf8');
       config = JSON.parse(existing);
+
+      // Preserve existing API key if present
+      if (config.mcpServers?.["i18n-agent"]?.env?.API_KEY) {
+        existingApiKey = config.mcpServers["i18n-agent"].env.API_KEY;
+        console.log('   🔑 Preserving existing API key');
+      }
     } catch (error) {
       console.warn(`Warning: Could not parse existing config at ${configPath}`);
     }
@@ -260,6 +278,11 @@ function updateGenericMCPConfig(configPath) {
 
   const baseConfig = createMCPConfig();
   config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
+
+  // Preserve existing API key
+  if (existingApiKey) {
+    config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+  }
 
   // Write config
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
