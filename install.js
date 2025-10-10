@@ -78,9 +78,6 @@ Features:
 📁 File translation (JSON, YAML, CSV, MD, etc.)
 💰 Credit balance checking
 🌐 48 languages supported with regional variants
-
-🔑 IMPORTANT: Get your API key at https://app.i18nagent.ai
-   (Required for the MCP client to work)
 `);
 
 const getMcpClientPaths = () => {
@@ -134,6 +131,45 @@ async function detectAvailableIDEs() {
   }
 
   return available;
+}
+
+function checkExistingApiKey(configPath) {
+  if (!fs.existsSync(configPath)) {
+    return false;
+  }
+
+  try {
+    const content = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(content);
+    const apiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY;
+    return apiKey && apiKey.trim() !== '';
+  } catch (error) {
+    return false;
+  }
+}
+
+async function checkExistingApiKeys(availableIDEs) {
+  const withKeys = [];
+  const withoutKeys = [];
+
+  for (const ide of availableIDEs) {
+    // Also check ~/.claude.json for Claude Code CLI
+    if (ide.key === 'claude-code') {
+      const claudeJsonPath = path.join(os.homedir(), '.claude.json');
+      if (checkExistingApiKey(claudeJsonPath)) {
+        withKeys.push(ide);
+        continue;
+      }
+    }
+
+    if (checkExistingApiKey(ide.configPath)) {
+      withKeys.push(ide);
+    } else {
+      withoutKeys.push(ide);
+    }
+  }
+
+  return { withKeys, withoutKeys };
 }
 
 function createMCPConfig() {
@@ -392,13 +428,8 @@ async function main() {
   try {
     console.log('🔍 Detecting available AI IDEs...\n');
 
-    // First, copy MCP client to stable location
-    console.log('📦 Installing MCP client files...');
-    copyMcpClientToStableLocation();
-    console.log('');
-
     const availableIDEs = await detectAvailableIDEs();
-    
+
     if (availableIDEs.length === 0) {
       console.log(`❌ No supported AI IDEs detected.
 
@@ -418,13 +449,48 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
 `);
       process.exit(1);
     }
-    
+
     console.log('✅ Available AI IDEs:');
     availableIDEs.forEach((ide, index) => {
       console.log(`${index + 1}. ${ide.name}`);
     });
-    
-    console.log('\n📝 Installing for all available IDEs...\n');
+    console.log('');
+
+    // Check for existing API keys BEFORE installation
+    const { withKeys, withoutKeys } = await checkExistingApiKeys(availableIDEs);
+
+    if (withKeys.length > 0 && withoutKeys.length === 0) {
+      console.log(`✅ API Keys Already Configured:`);
+      withKeys.forEach(ide => {
+        console.log(`   - ${ide.name}`);
+      });
+      console.log(`\n💚 Your API keys are preserved. Updating MCP client files only...\n`);
+    } else if (withKeys.length > 0 && withoutKeys.length > 0) {
+      // Mixed case: some have keys, some don't
+      console.log(`✅ API Keys Already Configured:`);
+      withKeys.forEach(ide => {
+        console.log(`   - ${ide.name}`);
+      });
+      console.log(`\n🔑 API Key Setup Required:`);
+      withoutKeys.forEach(ide => {
+        console.log(`   - ${ide.name}`);
+      });
+      console.log(`\n💚 Existing API keys will be preserved.`);
+      console.log(`💡 Get your API key at: https://app.i18nagent.ai\n`);
+    } else if (withoutKeys.length > 0) {
+      console.log(`🔑 API Key Setup Required:`);
+      withoutKeys.forEach(ide => {
+        console.log(`   - ${ide.name}`);
+      });
+      console.log(`\n💡 Get your API key at: https://app.i18nagent.ai\n`);
+    }
+
+    // Now copy MCP client to stable location
+    console.log('📦 Installing MCP client files...');
+    copyMcpClientToStableLocation();
+    console.log('');
+
+    console.log('📝 Updating configurations...\n');
 
     let installCount = 0;
     const installedIDEs = [];
