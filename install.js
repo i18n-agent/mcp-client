@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -98,6 +99,24 @@ function copyMcpClientToStableLocation() {
 
   // Copy mcp-client.js to stable location
   fs.copyFileSync(paths.sourceFile, paths.mcpClientPath);
+
+  // Copy package.json to stable location
+  const packageJsonSource = path.resolve(__dirname, 'package.json');
+  const packageJsonDest = path.join(paths.packageDir, 'package.json');
+  fs.copyFileSync(packageJsonSource, packageJsonDest);
+
+  // Install dependencies
+  console.log(`   📦 Installing dependencies...`);
+  try {
+    execSync('npm install --production --silent', {
+      cwd: paths.packageDir,
+      stdio: 'pipe'
+    });
+    console.log(`   ✅ Dependencies installed successfully`);
+  } catch (error) {
+    console.error(`   ⚠️  Warning: Failed to install dependencies automatically`);
+    console.error(`   💡 Run manually: cd ${paths.packageDir} && npm install`);
+  }
 
   console.log(`   📦 Installed MCP client to: ${paths.packageDir}`);
 
