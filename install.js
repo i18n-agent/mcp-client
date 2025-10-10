@@ -195,7 +195,7 @@ exec node "${mcpClientPath}"`;
   return wrapperPath;
 }
 
-function updateClaudeConfig(configPath) {
+function updateClaudeConfig(configPath, ideKey = 'claude') {
   let config = {};
   let existingApiKey = "";
 
@@ -220,29 +220,50 @@ function updateClaudeConfig(configPath) {
     config.mcpServers = {};
   }
 
-  // Detect if we need a wrapper script (for nvm users)
   const nodeEnv = detectNodeEnvironment();
-  const claudeDir = path.join(os.homedir(), '.claude');
+  const { mcpClientPath } = getMcpClientPaths();
 
-  if (nodeEnv.isNvm) {
-    // Create wrapper script for nvm users
-    console.log('   🔧 Detected nvm environment, creating wrapper script...');
-    const wrapperPath = createWrapperScript(claudeDir);
-
-    config.mcpServers["i18n-agent"] = {
-      command: wrapperPath,
-      env: {
-        MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-        API_KEY: existingApiKey || ""
+  // Claude Code CLI works better with command+args format (not wrapper)
+  if (ideKey === 'claude-code') {
+    if (nodeEnv.isNvm) {
+      // For nvm, use absolute node path with args
+      console.log('   🔧 Using direct node path for Claude Code CLI');
+      config.mcpServers["i18n-agent"] = {
+        command: nodeEnv.nodePath,
+        args: [mcpClientPath],
+        env: {
+          MCP_SERVER_URL: "https://mcp.i18nagent.ai",
+          API_KEY: existingApiKey || ""
+        }
+      };
+    } else {
+      // For system node, use 'node' with args
+      const baseConfig = createMCPConfig();
+      config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
+      if (existingApiKey) {
+        config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
       }
-    };
+    }
   } else {
-    // Standard configuration for system node
-    const baseConfig = createMCPConfig();
-    config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
-    // Preserve existing API key
-    if (existingApiKey) {
-      config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+    // Claude Desktop - use wrapper script for compatibility
+    if (nodeEnv.isNvm) {
+      const claudeDir = path.join(os.homedir(), '.claude');
+      console.log('   🔧 Detected nvm environment, creating wrapper script...');
+      const wrapperPath = createWrapperScript(claudeDir);
+
+      config.mcpServers["i18n-agent"] = {
+        command: wrapperPath,
+        env: {
+          MCP_SERVER_URL: "https://mcp.i18nagent.ai",
+          API_KEY: existingApiKey || ""
+        }
+      };
+    } else {
+      const baseConfig = createMCPConfig();
+      config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
+      if (existingApiKey) {
+        config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+      }
     }
   }
 
@@ -337,7 +358,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
         console.log(`⚙️  Configuring ${ide.name}...`);
 
         if (ide.key === 'claude' || ide.key === 'claude-code') {
-          updateClaudeConfig(ide.configPath);
+          updateClaudeConfig(ide.configPath, ide.key);
         } else {
           updateGenericMCPConfig(ide.configPath);
         }
