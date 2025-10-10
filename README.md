@@ -18,18 +18,12 @@ Professional translation service client for Claude, Cursor, VS Code, and other A
 
 ## 🚀 Quick Installation
 
-Install via npx (recommended):
-
-```bash
-npx -p @i18n-agent/mcp-client mcp-client
-```
-
-Or install globally:
-
 ```bash
 npm install -g @i18n-agent/mcp-client
 mcp-client
 ```
+
+**Note:** Global installation is required due to npm bin naming limitations. The installer will detect all available AI IDEs and configure them automatically.
 
 ## 🔑 Setup API Key
 
