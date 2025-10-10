@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.8.2';
+const MCP_CLIENT_VERSION = '1.8.17';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -1610,6 +1610,7 @@ async function handleDownloadTranslations(args) {
   };
 
   try {
+    // Step 1: Get download URLs from MCP server
     const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
       headers: { 'Content-Type': 'application/json' },
       timeout: 30000
@@ -1619,7 +1620,79 @@ async function handleDownloadTranslations(args) {
       throw new Error(`Download translations error: ${response.data.error.message || response.data.error}`);
     }
 
-    return response.data.result;
+    const result = response.data.result;
+
+    // Parse the MCP response
+    let parsedResult;
+    if (result && result.content && result.content[0]) {
+      parsedResult = JSON.parse(result.content[0].text);
+    } else {
+      parsedResult = result;
+    }
+
+    if (!parsedResult.success) {
+      throw new Error(parsedResult.error || 'Failed to get download URLs');
+    }
+
+    // Step 2: Download files from URLs and write to local /tmp
+    const outputDir = `/tmp/i18n-translations-${jobId}`;
+
+    // Create output directory
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const downloadUrls = parsedResult.downloadUrls;
+    if (!downloadUrls || downloadUrls.length === 0) {
+      throw new Error('No download URLs provided by server');
+    }
+
+    const filesWritten = [];
+
+    // Download each language file
+    for (const { language, url } of downloadUrls) {
+      try {
+        console.error(`📥 Downloading ${language}...`);
+
+        const fileResponse = await axios.get(url, {
+          responseType: 'text',
+          timeout: 60000, // 1 minute per file
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`
+          }
+        });
+
+        // Determine file extension from metadata
+        const fileType = parsedResult.metadata?.fileType || 'json';
+        const fileName = `${language}.${fileType}`;
+        const filePath = path.join(outputDir, fileName);
+
+        // Write file to disk
+        fs.writeFileSync(filePath, fileResponse.data, 'utf8');
+        filesWritten.push(filePath);
+
+        console.error(`✅ Downloaded ${fileName}`);
+      } catch (downloadError) {
+        console.error(`❌ Failed to download ${language}:`, downloadError.message);
+        throw new Error(`Failed to download ${language}: ${downloadError.message}`);
+      }
+    }
+
+    // Return success with file paths
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          success: true,
+          jobId,
+          outputDirectory: outputDir,
+          filesWritten,
+          metadata: parsedResult.metadata,
+          message: `✅ Downloaded ${filesWritten.length} translation files to ${outputDir}`
+        }, null, 2)
+      }]
+    };
+
   } catch (error) {
     console.error('Download translations error:', error);
 
