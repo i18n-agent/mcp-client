@@ -21,14 +21,14 @@ Professional translation service client for Claude, Cursor, VS Code, and other A
 Install via npx (recommended):
 
 ```bash
-npx @i18n-agent/mcp-client install
+npx -p @i18n-agent/mcp-client mcp-client
 ```
 
 Or install globally:
 
 ```bash
 npm install -g @i18n-agent/mcp-client
-i18n-agent-install
+mcp-client
 ```
 
 ## 🔑 Setup API Key

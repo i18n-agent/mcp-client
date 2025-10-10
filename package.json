@@ -1,6 +1,6 @@
 {
   "name": "@i18n-agent/mcp-client",
-  "version": "1.8.12",
+  "version": "1.8.13",
   "description": "🌍 i18n-agent MCP Client - 48 languages, AI-powered translation for Claude, Claude Code, Cursor, VS Code, Codex. Get API key at https://app.i18nagent.ai",
   "main": "mcp-client.js",
   "bin": {
@@ -10,7 +10,7 @@
   "scripts": {
     "install": "node install.js",
     "test": "node test.js",
-    "postinstall": "echo '\n🌍 i18n-agent MCP Client installed successfully!\n💡 Run: npx @i18n-agent/mcp-client install\n'"
+    "postinstall": "echo '\n🌍 i18n-agent MCP Client installed successfully!\n💡 Run: npx -p @i18n-agent/mcp-client mcp-client\n'"
   },
   "repository": {
     "type": "git",
