@@ -297,12 +297,27 @@ function updateGenericMCPConfig(configPath) {
     config.mcpServers = {};
   }
 
-  const baseConfig = createMCPConfig();
-  config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
+  const nodeEnv = detectNodeEnvironment();
+  const { mcpClientPath, packageDir } = getMcpClientPaths();
 
-  // Preserve existing API key
-  if (existingApiKey) {
-    config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+  // Use absolute node path for nvm environments, 'node' for system installations
+  if (nodeEnv.isNvm) {
+    console.log('   🔧 Using absolute node path for nvm environment');
+    config.mcpServers["i18n-agent"] = {
+      command: nodeEnv.nodePath,
+      args: [mcpClientPath],
+      cwd: packageDir,
+      env: {
+        MCP_SERVER_URL: "https://mcp.i18nagent.ai",
+        API_KEY: existingApiKey || ""
+      }
+    };
+  } else {
+    const baseConfig = createMCPConfig();
+    config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
+    if (existingApiKey) {
+      config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+    }
   }
 
   // Write config
