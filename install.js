@@ -198,6 +198,7 @@ exec node "${mcpClientPath}"`;
 function updateClaudeConfig(configPath, ideKey = 'claude') {
   let config = {};
   let existingApiKey = "";
+  let hasApiKey = false;
 
   // Read existing config if it exists
   if (fs.existsSync(configPath)) {
@@ -208,6 +209,7 @@ function updateClaudeConfig(configPath, ideKey = 'claude') {
       // Preserve existing API key if present
       if (config.mcpServers?.["i18n-agent"]?.env?.API_KEY) {
         existingApiKey = config.mcpServers["i18n-agent"].env.API_KEY;
+        hasApiKey = !!existingApiKey;
         console.log('   🔑 Preserving existing API key');
       }
     } catch (error) {
@@ -271,12 +273,13 @@ function updateClaudeConfig(configPath, ideKey = 'claude') {
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-  return config;
+  return { config, hasApiKey };
 }
 
 function updateGenericMCPConfig(configPath) {
   let config = {};
   let existingApiKey = "";
+  let hasApiKey = false;
 
   if (fs.existsSync(configPath)) {
     try {
@@ -286,6 +289,7 @@ function updateGenericMCPConfig(configPath) {
       // Preserve existing API key if present
       if (config.mcpServers?.["i18n-agent"]?.env?.API_KEY) {
         existingApiKey = config.mcpServers["i18n-agent"].env.API_KEY;
+        hasApiKey = !!existingApiKey;
         console.log('   🔑 Preserving existing API key');
       }
     } catch (error) {
@@ -324,7 +328,7 @@ function updateGenericMCPConfig(configPath) {
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-  return config;
+  return { config, hasApiKey };
 }
 
 function updateClaudeJsonConfig(configPath) {
@@ -424,13 +428,16 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
 
     let installCount = 0;
     const installedIDEs = [];
+    const idesWithApiKey = [];
+    const idesNeedingApiKey = [];
 
     for (const ide of availableIDEs) {
       try {
         console.log(`⚙️  Configuring ${ide.name}...`);
 
+        let result;
         if (ide.key === 'claude' || ide.key === 'claude-code') {
-          updateClaudeConfig(ide.configPath, ide.key);
+          result = updateClaudeConfig(ide.configPath, ide.key);
 
           // Claude Code CLI also needs ~/.claude.json updated (source of truth)
           if (ide.key === 'claude-code') {
@@ -441,7 +448,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
             }
           }
         } else {
-          updateGenericMCPConfig(ide.configPath);
+          result = updateGenericMCPConfig(ide.configPath);
         }
 
         console.log(`✅ ${ide.name} configured successfully!`);
@@ -449,47 +456,47 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
         installCount++;
         installedIDEs.push(ide);
 
+        // Track API key status
+        if (result && result.hasApiKey) {
+          idesWithApiKey.push(ide);
+        } else {
+          idesNeedingApiKey.push(ide);
+        }
+
       } catch (error) {
         console.error(`❌ Failed to configure ${ide.name}: ${error.message}\n`);
       }
     }
 
     if (installCount > 0) {
-      // Show config file paths for ONLY installed IDEs
-      const configPaths = installedIDEs.map(ide => `   - ${ide.name}: ${ide.displayPath}`).join('\n');
+      console.log(`🎉 Installation complete! Configured ${installCount} IDE(s).\n`);
 
-      // Platform-specific environment variable instructions
-      const isWindows = process.platform === 'win32';
-      const envVarInstructions = isWindows
-        ? `   Windows PowerShell:
-   $env:API_KEY="your-api-key-here"
+      // Show API key status
+      if (idesWithApiKey.length > 0) {
+        console.log(`✅ API Key Already Configured:`);
+        idesWithApiKey.forEach(ide => {
+          console.log(`   - ${ide.name}`);
+        });
+        console.log('');
+      }
 
-   Or set permanently via System Environment Variables:
-   1. Search "Environment Variables" in Windows
-   2. Click "New" under User variables
-   3. Variable name: API_KEY
-   4. Variable value: your-api-key-here`
-        : `   macOS/Linux:
-   export API_KEY=your-api-key-here
+      if (idesNeedingApiKey.length > 0) {
+        console.log(`⚠️  API Key Required For:`);
+        idesNeedingApiKey.forEach(ide => {
+          console.log(`   - ${ide.name} (${ide.displayPath})`);
+        });
+        console.log('');
 
-   Add to shell profile for persistence (~/.bashrc, ~/.zshrc):
-   echo 'export API_KEY=your-api-key-here' >> ~/.zshrc`;
-
-      console.log(`🎉 Installation complete! Configured ${installCount} IDE(s).
-
-🔑 CRITICAL: Add your API key (required for MCP client to work)
+        // Show setup instructions only for IDEs that need them
+        console.log(`🔑 Setup Instructions
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Step 1: Get your API key
    👉 Visit: https://app.i18nagent.ai
    👉 Sign up or log in
    👉 Copy your API key (starts with "i18n_")
 
-Step 2: Add API key to config file(s)
-${configPaths}
-
-   Option A - Edit config file directly (RECOMMENDED):
-   ────────────────────────────────────────────
-   Open the config file and find the "env" section:
+Step 2: Add API key to the config file
+   Open the config file and edit the "API_KEY" field:
 
    "mcpServers": {
      "i18n-agent": {
@@ -504,25 +511,19 @@ ${configPaths}
    Example with actual key:
    "API_KEY": "i18n_1234567890abcdef"
 
-   Option B - Use environment variable:
-   ────────────────────────────────────
-${envVarInstructions}
-
 Step 3: Restart your IDE
    Close and reopen your IDE to load the new configuration
+`);
+      }
 
-🧪 Test the installation
+      // Show test instructions (for all IDEs)
+      console.log(`
+🧪 Test the Installation
 ━━━━━━━━━━━━━━━━━━━━━━
 Try these commands in your AI IDE:
 ✓ "Translate 'Hello world' to Spanish"
 ✓ "Check my translation credits"
 ✓ "List supported languages"
-
-If you get "Invalid API key" errors, double-check:
-- API key is correctly pasted in the config file
-- No extra spaces or quotes around the key
-- Config file is saved
-- IDE has been restarted
 
 📚 Documentation: https://docs.i18nagent.ai
 🐛 Issues: https://github.com/i18n-agent/mcp-client/issues
