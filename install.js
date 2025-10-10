@@ -46,8 +46,8 @@ const IDE_CONFIGS = {
   },
   'claude-code': {
     name: 'Claude Code CLI',
-    configPath: path.join(os.homedir(), '.claude.json'),
-    displayPath: '~/.claude.json'
+    configPath: path.join(os.homedir(), '.config/claude/claude_code_config.json'),
+    displayPath: '~/.config/claude/claude_code_config.json'
   },
   cursor: {
     name: 'Cursor',
@@ -83,21 +83,37 @@ Features:
 `);
 
 const getMcpClientPaths = () => {
-  const mcpClientPath = path.resolve(__dirname, 'mcp-client.js');
-  const packageDir = path.dirname(mcpClientPath);
-  return { mcpClientPath, packageDir };
+  // Instead of using ephemeral npx cache, install to stable location
+  const stableDir = path.join(os.homedir(), '.claude', 'mcp-servers', 'i18n-agent');
+  const mcpClientPath = path.join(stableDir, 'mcp-client.js');
+  const packageDir = stableDir;
+  return { mcpClientPath, packageDir, sourceFile: path.resolve(__dirname, 'mcp-client.js') };
 };
+
+function copyMcpClientToStableLocation() {
+  const paths = getMcpClientPaths();
+
+  // Create stable directory
+  fs.mkdirSync(paths.packageDir, { recursive: true });
+
+  // Copy mcp-client.js to stable location
+  fs.copyFileSync(paths.sourceFile, paths.mcpClientPath);
+
+  console.log(`   📦 Installed MCP client to: ${paths.packageDir}`);
+
+  return paths;
+}
 
 async function detectAvailableIDEs() {
   const available = [];
-  
+
   for (const [key, config] of Object.entries(IDE_CONFIGS)) {
     const configDir = path.dirname(config.configPath);
     if (fs.existsSync(configDir)) {
       available.push({ key, ...config });
     }
   }
-  
+
   return available;
 }
 
@@ -236,7 +252,12 @@ function updateGenericMCPConfig(configPath) {
 async function main() {
   try {
     console.log('🔍 Detecting available AI IDEs...\n');
-    
+
+    // First, copy MCP client to stable location
+    console.log('📦 Installing MCP client files...');
+    copyMcpClientToStableLocation();
+    console.log('');
+
     const availableIDEs = await detectAvailableIDEs();
     
     if (availableIDEs.length === 0) {
@@ -312,32 +333,56 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
 
       console.log(`🎉 Installation complete! Configured ${installCount} IDE(s).
 
-🔑 NEXT STEP: Add your API key
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Get your API key from: https://app.i18nagent.ai
+🔑 CRITICAL: Add your API key (required for MCP client to work)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1: Get your API key
+   👉 Visit: https://app.i18nagent.ai
+   👉 Sign up or log in
+   👉 Copy your API key (starts with "i18n_")
 
-2. Add it to your config file(s):
+Step 2: Add API key to config file(s)
 ${configPaths}
 
-   Open the file and add your API key to the "env" section:
-   "env": {
-     "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
-     "API_KEY": "your-api-key-here"  ← Add your key here
+   Option A - Edit config file directly (RECOMMENDED):
+   ────────────────────────────────────────────
+   Open the config file and find the "env" section:
+
+   "mcpServers": {
+     "i18n-agent": {
+       "command": "...",
+       "env": {
+         "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
+         "API_KEY": ""  ← Paste your API key here (between the quotes)
+       }
+     }
    }
 
-   OR set as environment variable:
+   Example with actual key:
+   "API_KEY": "i18n_1234567890abcdef"
+
+   Option B - Use environment variable:
+   ────────────────────────────────────
 ${envVarInstructions}
 
-3. Restart your IDE to load the configuration
+Step 3: Restart your IDE
+   Close and reopen your IDE to load the new configuration
 
 🧪 Test the installation
+━━━━━━━━━━━━━━━━━━━━━━
 Try these commands in your AI IDE:
-- "Translate 'Hello world' to Spanish"
-- "Check my translation credits"
-- "List supported languages"
+✓ "Translate 'Hello world' to Spanish"
+✓ "Check my translation credits"
+✓ "List supported languages"
+
+If you get "Invalid API key" errors, double-check:
+- API key is correctly pasted in the config file
+- No extra spaces or quotes around the key
+- Config file is saved
+- IDE has been restarted
 
 📚 Documentation: https://docs.i18nagent.ai
 🐛 Issues: https://github.com/i18n-agent/mcp-client/issues
+💬 Support: support@i18nagent.ai
 `);
     } else {
       console.error('❌ Installation failed for all IDEs. Please check the error messages above.');
