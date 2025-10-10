@@ -607,7 +607,14 @@ Try these commands in your AI IDE:
 }
 
 // Handle command line execution
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Check if this file is being run directly (not imported)
+const isMainModule = process.argv[1] && (
+  import.meta.url === `file://${process.argv[1]}` ||
+  import.meta.url.endsWith(process.argv[1]) ||
+  process.argv[1].includes('mcp-client')
+);
+
+if (isMainModule) {
   main();
 }
 
