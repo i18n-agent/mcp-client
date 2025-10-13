@@ -184,7 +184,8 @@ function createMCPConfig() {
         env: {
           MCP_SERVER_URL: "https://mcp.i18nagent.ai",
           API_KEY: ""
-        }
+        },
+        disabled: false
       }
     }
   };
@@ -272,7 +273,8 @@ function updateClaudeConfig(configPath, ideKey = 'claude') {
         env: {
           MCP_SERVER_URL: "https://mcp.i18nagent.ai",
           API_KEY: existingApiKey || ""
-        }
+        },
+        disabled: false
       };
     } else {
       // For system node, use 'node' with args
@@ -294,7 +296,8 @@ function updateClaudeConfig(configPath, ideKey = 'claude') {
         env: {
           MCP_SERVER_URL: "https://mcp.i18nagent.ai",
           API_KEY: existingApiKey || ""
-        }
+        },
+        disabled: false
       };
     } else {
       const baseConfig = createMCPConfig();
@@ -350,7 +353,8 @@ function updateGenericMCPConfig(configPath) {
       env: {
         MCP_SERVER_URL: "https://mcp.i18nagent.ai",
         API_KEY: existingApiKey || ""
-      }
+      },
+      disabled: false
     };
   } else {
     const baseConfig = createMCPConfig();
@@ -402,7 +406,8 @@ function updateClaudeJsonConfig(configPath) {
       env: {
         MCP_SERVER_URL: "https://mcp.i18nagent.ai",
         API_KEY: existingApiKey || ""
-      }
+      },
+      disabled: false
     };
   } else {
     config.mcpServers["i18n-agent"] = {
@@ -411,7 +416,8 @@ function updateClaudeJsonConfig(configPath) {
       env: {
         MCP_SERVER_URL: "https://mcp.i18nagent.ai",
         API_KEY: existingApiKey || ""
-      }
+      },
+      disabled: false
     };
   }
 
