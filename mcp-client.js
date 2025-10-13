@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.8.18';
+const MCP_CLIENT_VERSION = '1.8.19';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -47,7 +47,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'translate_text',
-        description: '⚠️ CRITICAL: For multi-language translation, use targetLanguages parameter (not targetLanguage). Translate text content with cultural adaptation using AI subagents. Supports both single and multi-language translation. For large requests (>100 texts or >50,000 characters), returns a jobId for async processing. Use check_translation_status to monitor progress and download results.',
+        description: '⚠️ CRITICAL: For multi-language translation, use targetLanguages parameter (not targetLanguage). Translate text content with cultural adaptation using AI subagents. Supports both single and multi-language translation. For large requests (>100 texts or >50,000 characters), returns a jobId for async processing. Use check_translation_status to monitor progress and download results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -83,6 +83,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Optional additional context or instructions for the translation (e.g., "Keep technical terms in English", "Use formal tone")',
             },
+            pseudoTranslation: {
+              type: 'boolean',
+              description: 'Enable pseudo-translation mode for testing i18n implementations (bypasses AI translation, no credit cost)',
+            },
+            pseudoOptions: {
+              type: 'object',
+              properties: {
+                addCJK: {
+                  type: 'boolean',
+                  description: 'Add CJK characters to test wide character support',
+                },
+                expansionRatio: {
+                  type: 'number',
+                  description: 'Length expansion ratio (1.0 = no expansion, 1.3 = 30% longer, 2.0 = double length)',
+                },
+                addSpecialChars: {
+                  type: 'boolean',
+                  description: 'Add special characters to test encoding/escaping',
+                },
+                addBrackets: {
+                  type: 'boolean',
+                  description: 'Wrap strings with brackets to identify untranslated content',
+                },
+                addAccents: {
+                  type: 'boolean',
+                  description: 'Replace Latin characters with accented equivalents',
+                },
+              },
+              description: 'Configuration options for pseudo-translation',
+            },
           },
           required: ['texts', 'targetLanguages'],
         },
@@ -103,7 +133,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'translate_file',
-        description: '⚠️ CRITICAL: For multi-language translation, use targetLanguages parameter (not targetLanguage). Translate file content while preserving structure and format. Supports both single and multi-language translation. Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. For large files (>100KB), returns a jobId for async processing. Use check_translation_status to monitor progress and download results.',
+        description: '⚠️ CRITICAL: For multi-language translation, use targetLanguages parameter (not targetLanguage). Translate file content while preserving structure and format. Supports both single and multi-language translation. Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. For large files (>100KB), returns a jobId for async processing. Use check_translation_status to monitor progress and download results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -159,6 +189,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             context: {
               type: 'string',
               description: 'Optional additional context or instructions for the translation (e.g., "Keep technical terms in English", "Use formal tone")',
+            },
+            pseudoTranslation: {
+              type: 'boolean',
+              description: 'Enable pseudo-translation mode for testing i18n implementations (bypasses AI translation, no credit cost)',
+            },
+            pseudoOptions: {
+              type: 'object',
+              properties: {
+                addCJK: {
+                  type: 'boolean',
+                  description: 'Add CJK characters to test wide character support',
+                },
+                expansionRatio: {
+                  type: 'number',
+                  description: 'Length expansion ratio (1.0 = no expansion, 1.3 = 30% longer, 2.0 = double length)',
+                },
+                addSpecialChars: {
+                  type: 'boolean',
+                  description: 'Add special characters to test encoding/escaping',
+                },
+                addBrackets: {
+                  type: 'boolean',
+                  description: 'Wrap strings with brackets to identify untranslated content',
+                },
+                addAccents: {
+                  type: 'boolean',
+                  description: 'Replace Latin characters with accented equivalents',
+                },
+              },
+              description: 'Configuration options for pseudo-translation',
             },
           },
           required: ['targetLanguages'],
@@ -376,7 +436,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function handleTranslateText(args) {
-  const { texts, targetLanguages: rawTargetLanguages, sourceLanguage, targetAudience = 'general', industry = 'technology', region, context } = args;
+  const { texts, targetLanguages: rawTargetLanguages, sourceLanguage, targetAudience = 'general', industry = 'technology', region, context, pseudoTranslation, pseudoOptions } = args;
 
   if (!texts || !Array.isArray(texts) || texts.length === 0) {
     throw new Error('texts must be a non-empty array');
@@ -420,6 +480,8 @@ async function handleTranslateText(args) {
         industry: industry,
         region: region,
         context: context,
+        pseudoTranslation: pseudoTranslation,
+        pseudoOptions: pseudoOptions,
       }
     }
   };
@@ -684,7 +746,9 @@ async function handleTranslateFile(args) {
     outputFormat = 'same',
     sourceLanguage,
     region,
-    context
+    context,
+    pseudoTranslation,
+    pseudoOptions
   } = args;
 
   if (!filePath && !fileContent) {
@@ -740,6 +804,8 @@ async function handleTranslateFile(args) {
   if (targetLanguages !== undefined) requestArgs.targetLanguages = targetLanguages;
   if (region !== undefined) requestArgs.region = region;
   if (context !== undefined) requestArgs.context = context;
+  if (pseudoTranslation !== undefined) requestArgs.pseudoTranslation = pseudoTranslation;
+  if (pseudoOptions !== undefined) requestArgs.pseudoOptions = pseudoOptions;
 
   // Use MCP JSON-RPC protocol for translate_file
   const mcpRequest = {
