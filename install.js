@@ -102,6 +102,11 @@ function copyMcpClientToStableLocation() {
   const packageJsonDest = path.join(paths.packageDir, 'package.json');
   fs.copyFileSync(packageJsonSource, packageJsonDest);
 
+  // Copy namespace-detector.js to stable location (required dependency)
+  const namespaceDetectorSource = path.resolve(__dirname, 'namespace-detector.js');
+  const namespaceDetectorDest = path.join(paths.packageDir, 'namespace-detector.js');
+  fs.copyFileSync(namespaceDetectorSource, namespaceDetectorDest);
+
   // Install dependencies
   console.log(`   📦 Installing dependencies...`);
   try {
