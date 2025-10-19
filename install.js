@@ -586,6 +586,9 @@ Step 2: Add API key to the config file
 Step 3: Restart your IDE
    Close and reopen your IDE to load the new configuration
 `);
+      } else if (idesWithApiKey.length > 0 && idesNeedingApiKey.length === 0) {
+        // All IDEs have API keys - no setup needed, just restart
+        console.log(`💡 All IDEs have API keys configured. Just restart your IDE(s) to use the updated MCP client.`);
       }
 
       // Show test instructions (for all IDEs)
