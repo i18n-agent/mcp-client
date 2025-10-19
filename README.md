@@ -346,6 +346,7 @@ Translate text content with cultural adaptation and context awareness.
 - `targetLanguage` (string): Target language code
 - `targetAudience` (string): Target audience context
 - `industry` (string): Industry context
+- `namespace` (string, optional): Optional namespace identifier for backend tracking and project organization
 - `sourceLanguage` (string, optional): Source language (auto-detected if not provided)
 - `region` (string, optional): Specific region for localization
 
@@ -356,6 +357,7 @@ Translate files while preserving structure and format.
 - `filePath` or `fileContent` (string): File path or content to translate
 - `fileType` (string): File format (json, yaml, xml, csv, txt, md, etc.)
 - `targetLanguage` (string): Target language code
+- `namespace` (string, **required**): Unique namespace identifier for backend tracking and project organization
 - `preserveKeys` (boolean): Whether to preserve object keys/structure
 - `outputFormat` (string): Output format (same, json, yaml, txt)
 

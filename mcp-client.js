@@ -18,6 +18,7 @@ import {
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import { detectNamespaceFromPath, generateNamespaceSuggestions, getNamespaceSuggestionText } from './namespace-detector.js';
 
 const server = new Server(
   {
@@ -112,6 +113,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
               },
               description: 'Configuration options for pseudo-translation',
+            },
+            namespace: {
+              type: 'string',
+              description: 'Optional namespace identifier for backend tracking and project organization (recommended for file-based workflows)',
             },
           },
           required: ['texts', 'targetLanguages'],
@@ -220,8 +225,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               },
               description: 'Configuration options for pseudo-translation',
             },
+            namespace: {
+              type: 'string',
+              description: 'Unique namespace identifier for backend tracking and project organization (required for production use)',
+            },
           },
-          required: ['targetLanguages'],
+          required: ['targetLanguages', 'namespace'],
         },
       },
       {
@@ -436,11 +445,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function handleTranslateText(args) {
-  const { texts, targetLanguages: rawTargetLanguages, sourceLanguage, targetAudience = 'general', industry = 'technology', region, context, pseudoTranslation, pseudoOptions } = args;
+  const { texts, targetLanguages: rawTargetLanguages, sourceLanguage, targetAudience = 'general', industry = 'technology', region, context, pseudoTranslation, pseudoOptions, namespace } = args;
 
   if (!texts || !Array.isArray(texts) || texts.length === 0) {
     throw new Error('texts must be a non-empty array');
   }
+
+  // Namespace is optional for text translation, but recommended for organizational tracking
 
   // Normalize targetLanguages - accept both string and array
   let targetLanguages = rawTargetLanguages;
@@ -482,6 +493,7 @@ async function handleTranslateText(args) {
         context: context,
         pseudoTranslation: pseudoTranslation,
         pseudoOptions: pseudoOptions,
+        namespace: namespace,
       }
     }
   };
@@ -748,11 +760,34 @@ async function handleTranslateFile(args) {
     region,
     context,
     pseudoTranslation,
-    pseudoOptions
+    pseudoOptions,
+    namespace
   } = args;
 
   if (!filePath && !fileContent) {
     throw new Error('Either filePath or fileContent must be provided');
+  }
+
+  // Auto-detect namespace if not provided and filePath is available
+  let finalNamespace = namespace;
+  let detectionInfo = null;
+
+  if (!namespace && filePath) {
+    const detection = detectNamespaceFromPath(filePath);
+    if (detection.suggestion && detection.confidence > 0.5) {
+      finalNamespace = detection.suggestion;
+      detectionInfo = detection;
+      console.error(`🎯 [MCP CLIENT] Auto-detected namespace: "${finalNamespace}" (confidence: ${Math.round(detection.confidence * 100)}%, source: ${detection.source})`);
+    }
+  }
+
+  if (!finalNamespace) {
+    // Provide helpful suggestions when namespace is missing
+    const suggestionText = filePath
+      ? getNamespaceSuggestionText(filePath, path.basename(filePath))
+      : getNamespaceSuggestionText(null, null);
+
+    throw new Error(`namespace is required for translation tracking and project organization.\n\n${suggestionText}`);
   }
 
   // Normalize targetLanguages - accept both string and array
@@ -796,7 +831,8 @@ async function handleTranslateFile(args) {
     targetAudience,
     industry,
     preserveKeys,
-    outputFormat
+    outputFormat,
+    namespace: finalNamespace
   };
 
   // Add optional parameters only if defined
@@ -981,7 +1017,7 @@ async function pollTranslationJob(jobId, estimatedTime) {
       
       const response = await axios.post(MCP_SERVER_URL, statusRequest, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 10000
+        timeout: 30000
       });
       
       if (response.data.error) {
