@@ -1747,11 +1747,11 @@ async function handleDownloadTranslations(args) {
       // Case 1: S3 Storage - download files from presigned URLs
       console.error(`📥 Downloading ${Object.keys(parsedResult.downloadUrls).length} translation files from S3...`);
 
-      for (const [language, urlInfo] of Object.entries(parsedResult.downloadUrls)) {
+      for (const [language, downloadUrl] of Object.entries(parsedResult.downloadUrls)) {
         try {
           console.error(`📥 Downloading ${language}...`);
 
-          const fileResponse = await axios.get(urlInfo.url, {
+          const fileResponse = await axios.get(downloadUrl, {
             responseType: 'text',
             timeout: 60000, // 1 minute per file
             headers: {

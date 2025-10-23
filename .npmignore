@@ -1,5 +1,6 @@
 # Development files
 test.js
+test-download-translations.js
 .gitignore
 .env*
 
