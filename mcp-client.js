@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.8.19';
+const MCP_CLIENT_VERSION = '1.8.239';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -118,6 +118,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Optional namespace identifier for backend tracking and project organization (recommended for file-based workflows)',
             },
+            skipWarnings: {
+              type: 'boolean',
+              description: '⚠️ Skip source text quality warnings and proceed with translation (default: false). WARNING: Enabling this may hurt translation quality as it bypasses source file analysis that identifies potential issues. Only use when you are confident about your source content quality or in automated workflows where warnings would block progress.',
+              default: false,
+            },
           },
           required: ['texts', 'targetLanguages'],
         },
@@ -228,6 +233,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             namespace: {
               type: 'string',
               description: 'Unique namespace identifier for backend tracking and project organization (required for production use)',
+            },
+            skipWarnings: {
+              type: 'boolean',
+              description: '⚠️ Skip source text quality warnings and proceed with translation (default: false). WARNING: Enabling this may hurt translation quality as it bypasses source file analysis that identifies potential issues. Only use when you are confident about your source content quality or in automated workflows where warnings would block progress.',
+              default: false,
             },
           },
           required: ['targetLanguages', 'namespace'],
@@ -445,7 +455,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function handleTranslateText(args) {
-  const { texts, targetLanguages: rawTargetLanguages, sourceLanguage, targetAudience = 'general', industry = 'technology', region, context, pseudoTranslation, pseudoOptions, namespace } = args;
+  const { texts, targetLanguages: rawTargetLanguages, sourceLanguage, targetAudience = 'general', industry = 'technology', region, context, pseudoTranslation, pseudoOptions, namespace, skipWarnings = false } = args;
 
   if (!texts || !Array.isArray(texts) || texts.length === 0) {
     throw new Error('texts must be a non-empty array');
@@ -494,6 +504,7 @@ async function handleTranslateText(args) {
         pseudoTranslation: pseudoTranslation,
         pseudoOptions: pseudoOptions,
         namespace: namespace,
+        skipWarnings: skipWarnings,
       }
     }
   };
@@ -761,7 +772,8 @@ async function handleTranslateFile(args) {
     context,
     pseudoTranslation,
     pseudoOptions,
-    namespace
+    namespace,
+    skipWarnings = false
   } = args;
 
   if (!filePath && !fileContent) {
@@ -842,6 +854,7 @@ async function handleTranslateFile(args) {
   if (context !== undefined) requestArgs.context = context;
   if (pseudoTranslation !== undefined) requestArgs.pseudoTranslation = pseudoTranslation;
   if (pseudoOptions !== undefined) requestArgs.pseudoOptions = pseudoOptions;
+  if (skipWarnings !== undefined) requestArgs.skipWarnings = skipWarnings;
 
   // Use MCP JSON-RPC protocol for translate_file
   const mcpRequest = {

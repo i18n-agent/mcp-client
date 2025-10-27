@@ -211,6 +211,12 @@ Create `.cursor/mcp_settings.json` or `.vscode/mcp_settings.json`:
 - **Monitoring**: Check balance before large translations
 - **Estimates**: Get word count estimates before translation
 
+### Quality Warnings
+- **Source Analysis**: By default, source content is analyzed for quality issues before translation
+- **Skip Warnings**: Use `skipWarnings: true` to bypass warnings in automated workflows
+- **Trade-off**: Skipping warnings may reduce translation quality as potential issues aren't addressed
+- **Best Practice**: Keep warnings enabled (default) for production translations
+
 ## 🚨 Troubleshooting
 
 ### Installation Issues
@@ -349,6 +355,7 @@ Translate text content with cultural adaptation and context awareness.
 - `namespace` (string, optional): Optional namespace identifier for backend tracking and project organization
 - `sourceLanguage` (string, optional): Source language (auto-detected if not provided)
 - `region` (string, optional): Specific region for localization
+- `skipWarnings` (boolean, optional): Skip source text quality warnings (default: false). ⚠️ WARNING: May hurt translation quality by bypassing source analysis. Only use when confident about content quality or in automated workflows.
 
 ### translate_file
 Translate files while preserving structure and format.
@@ -360,6 +367,7 @@ Translate files while preserving structure and format.
 - `namespace` (string, **required**): Unique namespace identifier for backend tracking and project organization
 - `preserveKeys` (boolean): Whether to preserve object keys/structure
 - `outputFormat` (string): Output format (same, json, yaml, txt)
+- `skipWarnings` (boolean, optional): Skip source text quality warnings (default: false). ⚠️ WARNING: May hurt translation quality by bypassing source analysis. Only use when confident about content quality or in automated workflows.
 
 ### analyze_content
 Analyze content for translation readiness and get improvement suggestions before translation. This helps identify potential issues and optimize content before spending credits on translation.
