@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.8.239';
+const MCP_CLIENT_VERSION = '1.8.260';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -1609,19 +1609,19 @@ function getCodeBlockLanguage(fileType) {
 
 // Handler for checking translation status
 async function handleCheckTranslationStatus(args) {
-  const { jobId, languageCursor, pageSize } = args;
+  const { jobId, languageCursor, pageSize = 10 } = args; // Default pageSize to 10 to prevent token overflow
 
   if (!jobId) {
     throw new Error('jobId is required');
   }
 
-  // Build arguments with optional pagination params
-  const requestArgs = { jobId };
+  // Build arguments with pagination params (default pageSize prevents token overflow)
+  const requestArgs = {
+    jobId,
+    pageSize // Always include pageSize (defaults to 10)
+  };
   if (languageCursor !== undefined) {
     requestArgs.languageCursor = languageCursor;
-  }
-  if (pageSize !== undefined) {
-    requestArgs.pageSize = pageSize;
   }
 
   const mcpRequest = {
