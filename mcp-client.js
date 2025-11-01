@@ -325,13 +325,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
        */
       {
         name: 'check_translation_status',
-        description: 'Check the status and progress of an async translation job. Returns progress percentage, elapsed time, and downloads completed translation results when finished.',
+        description: 'Check the status and progress of an async translation job. Returns progress percentage, elapsed time, and downloads completed translation results when finished. Supports cursor-based pagination for download URLs to reduce token usage when checking jobs with many languages (recommended for jobs with >10 languages).',
         inputSchema: {
           type: 'object',
           properties: {
             jobId: {
               type: 'string',
               description: 'The job ID returned from translate_text (>100 texts or >50,000 chars) or translate_file (>100KB) for async processing',
+            },
+            languageCursor: {
+              type: 'string',
+              description: 'Optional: Starting language code for pagination (e.g., "de", "es"). Omit to start from the beginning. Use the nextCursor value from the previous response to get the next page of languages.',
+            },
+            pageSize: {
+              type: 'number',
+              description: 'Optional: Number of languages to return per page (default: 10). Recommended for jobs with many languages to reduce token usage. Without pagination, responses for 32-language jobs can be ~11k tokens.',
             },
           },
           required: ['jobId'],
@@ -1601,10 +1609,19 @@ function getCodeBlockLanguage(fileType) {
 
 // Handler for checking translation status
 async function handleCheckTranslationStatus(args) {
-  const { jobId } = args;
+  const { jobId, languageCursor, pageSize } = args;
 
   if (!jobId) {
     throw new Error('jobId is required');
+  }
+
+  // Build arguments with optional pagination params
+  const requestArgs = { jobId };
+  if (languageCursor !== undefined) {
+    requestArgs.languageCursor = languageCursor;
+  }
+  if (pageSize !== undefined) {
+    requestArgs.pageSize = pageSize;
   }
 
   const mcpRequest = {
@@ -1613,7 +1630,7 @@ async function handleCheckTranslationStatus(args) {
     method: 'tools/call',
     params: {
       name: 'check_translation_status',
-      arguments: { jobId }
+      arguments: requestArgs
     }
   };
 
@@ -1764,12 +1781,13 @@ async function handleDownloadTranslations(args) {
         try {
           console.error(`📥 Downloading ${language}...`);
 
+          // CRITICAL FIX: S3 presigned URLs are self-contained and include authentication in the URL
+          // Adding an Authorization header causes S3 to reject the request with 400/403
+          // because the signature was calculated without the Authorization header
           const fileResponse = await axios.get(downloadUrl, {
             responseType: 'text',
-            timeout: 60000, // 1 minute per file
-            headers: {
-              'Authorization': `Bearer ${API_KEY}`
-            }
+            timeout: 60000 // 1 minute per file
+            // DO NOT add Authorization header for S3 presigned URLs
           });
 
           // Determine file extension from file name or metadata
