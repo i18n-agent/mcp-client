@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.8.455';
+const MCP_CLIENT_VERSION = '1.8.461';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -18,6 +18,7 @@ import {
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import FormData from 'form-data';
 import { detectNamespaceFromPath, generateNamespaceSuggestions, getNamespaceSuggestionText } from './namespace-detector.js';
 
 const server = new Server(
@@ -375,7 +376,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'upload_translations',
-        description: 'Upload existing translations for reuse to reduce translation costs. Supports two modes: (1) Single file mode - upload a translated i18n file (JSON, YAML, PO, XLIFF, etc.) using filePath/fileContent params. (2) Parallel document mode - upload source + target document pairs (MD, TXT, HTML) using sourceFilePath/targetFilePath params for sentence-aligned extraction. Namespace is auto-detected from file path or can be explicitly provided.',
+        description: 'Upload existing translations for reuse to reduce costs. Provide sourceFilePath (original language file) and targetFilePath (translated file) with sourceLocale and targetLocale. Example: sourceFilePath="/docs/en/guide.md", targetFilePath="/docs/de/guide.md", sourceLocale="en", targetLocale="de". Supports JSON, YAML, PO, XLIFF, MD, TXT, HTML. Namespace is auto-detected or can be explicitly provided.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -2045,28 +2046,22 @@ async function handleSingleFileUpload(args) {
   // Detect file type if auto
   const detectedFileType = fileType === 'auto' ? path.extname(filePath || 'file').slice(1) || 'json' : fileType;
 
-  // Build request to backend endpoint
-  const requestData = {
-    apiKey: API_KEY,
-    namespace: finalNamespace,
-    fileName: filePath ? path.basename(filePath) : 'uploaded-file',
-    fileContent: content,
-    fileType: detectedFileType,
-    sourceLocale,
-    targetLocale
-  };
+  // Build request using FormData (server expects multipart/form-data)
+  const fileName = filePath ? path.basename(filePath) : 'uploaded-file';
+
+  const formData = new FormData();
+  formData.append('file', content, fileName);
+  formData.append('sourceLocale', sourceLocale);
+  formData.append('targetLocale', targetLocale);
 
   try {
-    const response = await axios.post(`${MCP_SERVER_URL}/namespaces/${finalNamespace}/translations/upload`,
-      requestData.fileContent,
+    const response = await axios.post(
+      `${MCP_SERVER_URL}/namespaces/${finalNamespace}/translations/upload`,
+      formData,
       {
         headers: {
-          'Content-Type': 'text/plain',
           'Authorization': `Bearer ${API_KEY}`,
-          'X-Source-Locale': sourceLocale,
-          'X-Target-Locale': targetLocale,
-          'X-File-Name': requestData.fileName,
-          'X-File-Type': detectedFileType
+          ...formData.getHeaders()
         },
         timeout: 60000
       }
@@ -2083,7 +2078,7 @@ async function handleSingleFileUpload(args) {
         type: 'text',
         text: `✅ Translation Upload Successful\n\n` +
               `📂 Namespace: ${finalNamespace}${detectionInfo ? ` (auto-detected)` : ''}\n` +
-              `📄 File: ${requestData.fileName}\n` +
+              `📄 File: ${fileName}\n` +
               `🌍 Languages: ${sourceLocale} → ${targetLocale}\n` +
               `✨ Translation Pairs Stored: ${result.pairsStored || 0}\n` +
               `🔄 Translation Pairs Updated: ${result.pairsUpdated || 0}\n\n` +
@@ -2167,8 +2162,8 @@ async function handleParallelDocumentUpload(args) {
 
   // Build request
   const formData = new FormData();
-  formData.append('sourceFile', new Blob([sourceContent]), sourceFilePath ? path.basename(sourceFilePath) : 'source.md');
-  formData.append('targetFile', new Blob([targetContent]), targetFilePath ? path.basename(targetFilePath) : 'target.md');
+  formData.append('sourceFile', sourceContent, sourceFilePath ? path.basename(sourceFilePath) : 'source.md');
+  formData.append('targetFile', targetContent, targetFilePath ? path.basename(targetFilePath) : 'target.md');
   formData.append('sourceLanguage', sourceLocale);
   formData.append('targetLanguage', targetLocale);
   formData.append('namespace', finalNamespace);
