@@ -47,8 +47,8 @@ const IDE_CONFIGS = {
   },
   'claude-code': {
     name: 'Claude Code CLI',
-    configPath: path.join(os.homedir(), '.config/claude/claude_code_config.json'),
-    displayPath: '~/.config/claude/claude_code_config.json'
+    configPath: path.join(os.homedir(), '.claude.json'),
+    displayPath: '~/.claude.json'
   },
   cursor: {
     name: 'Cursor',
@@ -375,66 +375,6 @@ function updateGenericMCPConfig(configPath) {
 
   return { config, hasApiKey };
 }
-
-function updateClaudeJsonConfig(configPath) {
-  let config = {};
-  let existingApiKey = "";
-
-  if (fs.existsSync(configPath)) {
-    try {
-      const existing = fs.readFileSync(configPath, 'utf8');
-      config = JSON.parse(existing);
-
-      // Preserve existing API key if present
-      if (config.mcpServers?.["i18n-agent"]?.env?.API_KEY) {
-        existingApiKey = config.mcpServers["i18n-agent"].env.API_KEY;
-        console.log('   🔑 Preserving existing API key from ~/.claude.json');
-      }
-    } catch (error) {
-      console.warn(`   ⚠️  Warning: Could not parse ~/.claude.json - it may be corrupted`);
-      return;
-    }
-  }
-
-  if (!config.mcpServers) {
-    config.mcpServers = {};
-  }
-
-  const nodeEnv = detectNodeEnvironment();
-  const { mcpClientPath } = getMcpClientPaths();
-
-  // Use absolute node path for nvm, 'node' for system installations
-  if (nodeEnv.isNvm) {
-    config.mcpServers["i18n-agent"] = {
-      command: nodeEnv.nodePath,
-      args: [mcpClientPath],
-      env: {
-        MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-        API_KEY: existingApiKey || ""
-      },
-      disabled: false
-    };
-  } else {
-    config.mcpServers["i18n-agent"] = {
-      command: "node",
-      args: [mcpClientPath],
-      env: {
-        MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-        API_KEY: existingApiKey || ""
-      },
-      disabled: false
-    };
-  }
-
-  // Write config
-  try {
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-    console.log('   ✅ ~/.claude.json updated');
-  } catch (error) {
-    console.warn(`   ⚠️  Warning: Failed to write ~/.claude.json: ${error.message}`);
-  }
-}
-
 async function main() {
   try {
     console.log('🔍 Detecting available AI IDEs...\n');
@@ -515,15 +455,6 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
         let result;
         if (ide.key === 'claude' || ide.key === 'claude-code') {
           result = updateClaudeConfig(ide.configPath, ide.key);
-
-          // Claude Code CLI also needs ~/.claude.json updated (source of truth)
-          if (ide.key === 'claude-code') {
-            const claudeJsonPath = path.join(os.homedir(), '.claude.json');
-            if (fs.existsSync(claudeJsonPath)) {
-              console.log('   🔧 Updating ~/.claude.json (source of truth)...');
-              updateClaudeJsonConfig(claudeJsonPath);
-            }
-          }
         } else {
           result = updateGenericMCPConfig(ide.configPath);
         }

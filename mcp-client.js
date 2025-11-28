@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.8.260';
+const MCP_CLIENT_VERSION = '1.8.455';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -373,6 +373,82 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['jobId'],
         },
       },
+      {
+        name: 'upload_translations',
+        description: 'Upload existing translations for reuse to reduce translation costs. Supports two modes: (1) Single file mode - upload a translated i18n file (JSON, YAML, PO, XLIFF, etc.) using filePath/fileContent params. (2) Parallel document mode - upload source + target document pairs (MD, TXT, HTML) using sourceFilePath/targetFilePath params for sentence-aligned extraction. Namespace is auto-detected from file path or can be explicitly provided.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            // Single file mode parameters
+            filePath: {
+              type: 'string',
+              description: 'Path to translated i18n file (for single file mode). Use this OR sourceFilePath/targetFilePath.',
+            },
+            fileContent: {
+              type: 'string',
+              description: 'File content as string (for single file mode, required if filePath is not provided)',
+            },
+            // Parallel document mode parameters
+            sourceFilePath: {
+              type: 'string',
+              description: 'Path to source language document (for parallel mode). Use with targetFilePath.',
+            },
+            sourceFileContent: {
+              type: 'string',
+              description: 'Source document content as string (for parallel mode)',
+            },
+            targetFilePath: {
+              type: 'string',
+              description: 'Path to target language document (for parallel mode). Use with sourceFilePath.',
+            },
+            targetFileContent: {
+              type: 'string',
+              description: 'Target document content as string (for parallel mode)',
+            },
+            // Common parameters
+            fileType: {
+              type: 'string',
+              description: 'File format. Single file mode: json, yaml, yml, po, pot, mo, xml, arb, strings, stringsdict, plist, properties, xliff, xlf, resx. Parallel mode: md, markdown, txt, html, htm, json, yaml, yml. Default: auto',
+              default: 'auto',
+            },
+            sourceLocale: {
+              type: 'string',
+              description: 'Source language code (e.g., "en", "en-US")',
+            },
+            targetLocale: {
+              type: 'string',
+              description: 'Target language code (e.g., "es", "fr", "ja")',
+            },
+            namespace: {
+              type: 'string',
+              description: 'Namespace identifier for translation tracking (auto-detected from file path if not provided)',
+            },
+          },
+          required: ['sourceLocale', 'targetLocale'],
+        },
+      },
+      {
+        name: 'list_uploaded_translations',
+        description: 'List all uploaded translation files in a namespace, showing file names, language pairs, translation counts, and upload dates. Helps track what translations are available for reuse.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            namespace: {
+              type: 'string',
+              description: 'Namespace identifier',
+            },
+            sourceLocale: {
+              type: 'string',
+              description: 'Filter by source language (optional)',
+            },
+            targetLocale: {
+              type: 'string',
+              description: 'Filter by target language (optional)',
+            },
+          },
+          required: ['namespace'],
+        },
+      },
     ],
   };
 });
@@ -412,6 +488,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'download_translations':
         return await handleDownloadTranslations(args);
+
+      case 'upload_translations':
+        return await handleUploadTranslations(args);
+
+      case 'list_uploaded_translations':
+        return await handleListUploadedTranslations(args);
 
       default:
         throw new McpError(
@@ -1870,6 +1952,344 @@ async function handleDownloadTranslations(args) {
 
     // Generic error
     throw new Error(`Unable to download translations: ${error.message}`);
+  }
+}
+
+async function handleUploadTranslations(args) {
+  const {
+    // Single file mode
+    filePath,
+    fileContent,
+    // Parallel document mode
+    sourceFilePath,
+    sourceFileContent,
+    targetFilePath,
+    targetFileContent,
+    // Common
+    fileType = 'auto',
+    sourceLocale,
+    targetLocale,
+    namespace
+  } = args;
+
+  if (!sourceLocale || !targetLocale) {
+    throw new Error('sourceLocale and targetLocale are required');
+  }
+
+  // Detect mode based on parameters provided
+  const hasParallelParams = sourceFilePath || sourceFileContent || targetFilePath || targetFileContent;
+  const hasSingleFileParams = filePath || fileContent;
+
+  if (hasParallelParams && hasSingleFileParams) {
+    throw new Error('Cannot mix single file mode (filePath/fileContent) with parallel mode (sourceFilePath/targetFilePath). Use one mode at a time.');
+  }
+
+  if (!hasParallelParams && !hasSingleFileParams) {
+    throw new Error('Either provide filePath/fileContent (single file mode) OR sourceFilePath/targetFilePath (parallel document mode)');
+  }
+
+  // Route to appropriate handler
+  if (hasParallelParams) {
+    return await handleParallelDocumentUpload(args);
+  } else {
+    return await handleSingleFileUpload(args);
+  }
+}
+
+// Single file upload handler (for translated i18n files)
+async function handleSingleFileUpload(args) {
+  const {
+    filePath,
+    fileContent,
+    fileType = 'auto',
+    sourceLocale,
+    targetLocale,
+    namespace
+  } = args;
+
+  if (!filePath && !fileContent) {
+    throw new Error('Either filePath or fileContent must be provided');
+  }
+
+  // Auto-detect namespace if not provided
+  let finalNamespace = namespace;
+  let detectionInfo = null;
+
+  if (!namespace && filePath) {
+    const detection = detectNamespaceFromPath(filePath);
+    if (detection.suggestion && detection.confidence > 0.5) {
+      finalNamespace = detection.suggestion;
+      detectionInfo = detection;
+      console.error(`🎯 [MCP CLIENT] Auto-detected namespace: "${finalNamespace}" (confidence: ${Math.round(detection.confidence * 100)}%, source: ${detection.source})`);
+    }
+  }
+
+  if (!finalNamespace) {
+    const suggestionText = filePath
+      ? getNamespaceSuggestionText(filePath, path.basename(filePath))
+      : getNamespaceSuggestionText(null, null);
+
+    throw new Error(`namespace is required for translation upload.\n\n${suggestionText}`);
+  }
+
+  // Read file content if path provided
+  let content = fileContent;
+  if (filePath && !fileContent) {
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+      throw new Error(`Failed to read file: ${error.message}`);
+    }
+  }
+
+  // Detect file type if auto
+  const detectedFileType = fileType === 'auto' ? path.extname(filePath || 'file').slice(1) || 'json' : fileType;
+
+  // Build request to backend endpoint
+  const requestData = {
+    apiKey: API_KEY,
+    namespace: finalNamespace,
+    fileName: filePath ? path.basename(filePath) : 'uploaded-file',
+    fileContent: content,
+    fileType: detectedFileType,
+    sourceLocale,
+    targetLocale
+  };
+
+  try {
+    const response = await axios.post(`${MCP_SERVER_URL}/namespaces/${finalNamespace}/translations/upload`,
+      requestData.fileContent,
+      {
+        headers: {
+          'Content-Type': 'text/plain',
+          'Authorization': `Bearer ${API_KEY}`,
+          'X-Source-Locale': sourceLocale,
+          'X-Target-Locale': targetLocale,
+          'X-File-Name': requestData.fileName,
+          'X-File-Type': detectedFileType
+        },
+        timeout: 60000
+      }
+    );
+
+    if (response.data.error) {
+      throw new Error(`Upload error: ${response.data.error.message || response.data.error}`);
+    }
+
+    const result = response.data;
+
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ Translation Upload Successful\n\n` +
+              `📂 Namespace: ${finalNamespace}${detectionInfo ? ` (auto-detected)` : ''}\n` +
+              `📄 File: ${requestData.fileName}\n` +
+              `🌍 Languages: ${sourceLocale} → ${targetLocale}\n` +
+              `✨ Translation Pairs Stored: ${result.pairsStored || 0}\n` +
+              `🔄 Translation Pairs Updated: ${result.pairsUpdated || 0}\n\n` +
+              `💡 These translations will be automatically reused when translating files in the "${finalNamespace}" namespace, reducing costs and ensuring consistency.`
+      }]
+    };
+  } catch (error) {
+    console.error('Upload translations error:', error);
+
+    // Handle 401 unauthorized
+    if (error.response?.status === 401) {
+      throw new Error(`❌ Invalid API key (401)\nPlease check your API key at https://app.i18nagent.ai`);
+    }
+
+    // Handle 404 namespace not found
+    if (error.response?.status === 404) {
+      throw new Error(`❌ Namespace "${finalNamespace}" not found. Create it first by translating a file with this namespace.`);
+    }
+
+    // Handle 409 duplicate
+    if (error.response?.status === 409) {
+      const errorData = error.response.data;
+      throw new Error(`⚠️ Duplicate file detected\n${errorData.message || 'This file was already uploaded'}`);
+    }
+
+    throw new Error(`Unable to upload translations: ${error.message}`);
+  }
+}
+
+// Parallel document upload handler (for source + target document pairs)
+async function handleParallelDocumentUpload(args) {
+  const {
+    sourceFilePath,
+    sourceFileContent,
+    targetFilePath,
+    targetFileContent,
+    fileType = 'auto',
+    sourceLocale,
+    targetLocale,
+    namespace
+  } = args;
+
+  // Validation
+  if (!sourceFilePath && !sourceFileContent) {
+    throw new Error('Either sourceFilePath or sourceFileContent must be provided');
+  }
+  if (!targetFilePath && !targetFileContent) {
+    throw new Error('Either targetFilePath or targetFileContent must be provided');
+  }
+
+  // Auto-detect namespace (prefer source file path)
+  let finalNamespace = namespace;
+  if (!namespace && sourceFilePath) {
+    const detection = detectNamespaceFromPath(sourceFilePath);
+    if (detection.suggestion && detection.confidence > 0.5) {
+      finalNamespace = detection.suggestion;
+      console.error(`🎯 [MCP CLIENT] Auto-detected namespace: "${finalNamespace}"`);
+    }
+  }
+
+  if (!finalNamespace) {
+    const suggestionText = getNamespaceSuggestionText(sourceFilePath || targetFilePath, null);
+    throw new Error(`namespace is required for parallel document upload.\n\n${suggestionText}`);
+  }
+
+  // Read files
+  let sourceContent = sourceFileContent;
+  let targetContent = targetFileContent;
+
+  if (sourceFilePath && !sourceFileContent) {
+    sourceContent = fs.readFileSync(sourceFilePath, 'utf8');
+  }
+  if (targetFilePath && !targetFileContent) {
+    targetContent = fs.readFileSync(targetFilePath, 'utf8');
+  }
+
+  // Detect file type
+  const detectedFileType = fileType === 'auto'
+    ? path.extname(sourceFilePath || 'file').slice(1) || 'md'
+    : fileType;
+
+  // Build request
+  const formData = new FormData();
+  formData.append('sourceFile', new Blob([sourceContent]), sourceFilePath ? path.basename(sourceFilePath) : 'source.md');
+  formData.append('targetFile', new Blob([targetContent]), targetFilePath ? path.basename(targetFilePath) : 'target.md');
+  formData.append('sourceLanguage', sourceLocale);
+  formData.append('targetLanguage', targetLocale);
+  formData.append('namespace', finalNamespace);
+
+  try {
+    const response = await axios.post(`${MCP_SERVER_URL}/translations/upload-parallel`,
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          ...formData.getHeaders()
+        },
+        timeout: 120000
+      }
+    );
+
+    if (response.data.error) {
+      throw new Error(`Upload error: ${response.data.error.message || response.data.error}`);
+    }
+
+    const result = response.data;
+
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ Parallel Document Upload Successful\n\n` +
+              `📂 Namespace: ${finalNamespace}\n` +
+              `📄 Source: ${sourceFilePath ? path.basename(sourceFilePath) : 'source content'}\n` +
+              `📄 Target: ${targetFilePath ? path.basename(targetFilePath) : 'target content'}\n` +
+              `🌍 Languages: ${sourceLocale} → ${targetLocale}\n` +
+              `✨ Translation Pairs Extracted: ${result.pairsStored || 0}\n` +
+              `🔄 Translation Pairs Updated: ${result.pairsUpdated || 0}\n\n` +
+              `💡 These aligned translations will be automatically reused when translating similar documents.`
+      }]
+    };
+  } catch (error) {
+    console.error('Upload parallel documents error:', error);
+
+    if (error.response?.status === 401) {
+      throw new Error(`❌ Invalid API key (401)`);
+    }
+
+    if (error.response?.status === 404) {
+      throw new Error(`❌ Namespace "${finalNamespace}" not found`);
+    }
+
+    throw new Error(`Unable to upload parallel documents: ${error.message}`);
+  }
+}
+
+async function handleListUploadedTranslations(args) {
+  const {
+    namespace,
+    sourceLocale,
+    targetLocale
+  } = args;
+
+  if (!namespace) {
+    throw new Error('namespace is required');
+  }
+
+  // Build query parameters
+  const params = new URLSearchParams();
+  if (sourceLocale) params.append('sourceLocale', sourceLocale);
+  if (targetLocale) params.append('targetLocale', targetLocale);
+
+  try {
+    const response = await axios.get(
+      `${MCP_SERVER_URL}/namespaces/${namespace}/translations/files?${params.toString()}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`
+        },
+        timeout: 30000
+      }
+    );
+
+    if (response.data.error) {
+      throw new Error(`List error: ${response.data.error.message || response.data.error}`);
+    }
+
+    const result = response.data;
+
+    if (!result.files || result.files.length === 0) {
+      return {
+        content: [{
+          type: 'text',
+          text: `📂 Namespace: ${namespace}\n\n` +
+                `No uploaded translation files found.\n\n` +
+                `💡 Use upload_translations to upload translation files for reuse.`
+        }]
+      };
+    }
+
+    const filesList = result.files.map((file, idx) =>
+      `${idx + 1}. ${file.originalFileName}\n` +
+      `   🌍 ${file.sourceLocale} → ${file.targetLocale}\n` +
+      `   ✨ ${file.pairsExtracted} pairs\n` +
+      `   📅 Uploaded: ${new Date(file.createdAt).toLocaleDateString()}`
+    ).join('\n\n');
+
+    return {
+      content: [{
+        type: 'text',
+        text: `📂 Namespace: ${namespace}\n` +
+              `📊 Total Files: ${result.totalFiles}\n\n` +
+              `Uploaded Translation Files:\n\n${filesList}`
+      }]
+    };
+  } catch (error) {
+    console.error('List uploaded translations error:', error);
+
+    if (error.response?.status === 401) {
+      throw new Error(`❌ Invalid API key (401)`);
+    }
+
+    if (error.response?.status === 404) {
+      throw new Error(`❌ Namespace "${namespace}" not found`);
+    }
+
+    throw new Error(`Unable to list uploaded translations: ${error.message}`);
   }
 }
 
