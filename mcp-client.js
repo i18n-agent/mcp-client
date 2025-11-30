@@ -49,7 +49,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'translate_text',
-        description: '⚠️ CRITICAL: For multi-language translation, use targetLanguages parameter (not targetLanguage). Translate text content with cultural adaptation using AI subagents. Supports both single and multi-language translation. For large requests (>100 texts or >50,000 characters), returns a jobId for async processing. Use check_translation_status to monitor progress and download results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
+        description: 'Translate text content with cultural adaptation using AI subagents. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). For large requests (>100 texts or >50,000 characters), returns a jobId for async processing. Use check_translation_status to monitor progress and download results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -59,7 +59,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Array of source texts to translate (any language)',
             },
             targetLanguages: {
-              description: '⚠️ REQUIRED: Target language(s) - can be a single string (e.g., "es") OR an array of strings (e.g., ["es", "fr", "zh-CN"]) for multi-language translation',
+              description: 'Target language(s) - provide a single string (e.g., "es") OR an array (e.g., ["es", "fr", "zh-CN"]) for multi-language translation. Use specific locale codes like "en-US" or "en-GB" instead of generic "en".',
               oneOf: [
                 { type: 'string' },
                 { type: 'array', items: { type: 'string' } }
@@ -144,7 +144,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'translate_file',
-        description: '⚠️ CRITICAL: For multi-language translation, use targetLanguages parameter (not targetLanguage). Translate file content while preserving structure and format. Supports both single and multi-language translation. Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. For large files (>100KB), returns a jobId for async processing. Use check_translation_status to monitor progress and download results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
+        description: 'Translate file content while preserving structure and format. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. Always returns a jobId for async processing - use check_translation_status to monitor progress and download_translations to get results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -163,7 +163,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               default: 'auto',
             },
             targetLanguages: {
-              description: '⚠️ REQUIRED: Target language(s) - can be a single string (e.g., "es") OR an array of strings (e.g., ["es", "fr", "zh-CN"]) for multi-language translation',
+              description: 'Target language(s) - provide a single string (e.g., "es") OR an array (e.g., ["es", "fr", "zh-CN"]) for multi-language translation. Use specific locale codes like "en-US" or "en-GB" instead of generic "en".',
               oneOf: [
                 { type: 'string' },
                 { type: 'array', items: { type: 'string' } }
@@ -555,17 +555,9 @@ async function handleTranslateText(args) {
   // Namespace is optional for text translation, but recommended for organizational tracking
 
   // Normalize targetLanguages - accept both string and array
-  let targetLanguages = rawTargetLanguages;
-  let targetLanguage = undefined;
-
-  if (typeof rawTargetLanguages === 'string') {
-    // Single language provided as string - convert to array for internal processing
-    targetLanguages = [rawTargetLanguages];
-    targetLanguage = rawTargetLanguages;
-  } else if (Array.isArray(rawTargetLanguages) && rawTargetLanguages.length === 1) {
-    // Single language provided as array - extract for backward compatibility
-    targetLanguage = rawTargetLanguages[0];
-  }
+  const targetLanguages = typeof rawTargetLanguages === 'string'
+    ? [rawTargetLanguages]
+    : rawTargetLanguages;
 
   if (!targetLanguages?.length) {
     throw new Error('targetLanguages parameter is required (can be a string for single language or array for multiple languages)');
@@ -585,7 +577,6 @@ async function handleTranslateText(args) {
       arguments: {
         apiKey: API_KEY,
         texts: texts,
-        targetLanguage: targetLanguage,
         targetLanguages: targetLanguages,
         sourceLanguage: sourceLanguage && sourceLanguage !== 'auto' ? sourceLanguage : undefined,
         targetAudience: targetAudience,
@@ -640,12 +631,12 @@ async function handleTranslateText(args) {
           // Extract the actual translation result from the job result
           if (jobResult && jobResult.content && jobResult.content[0]) {
             const translationData = JSON.parse(jobResult.content[0].text);
-            return formatTranslationResult(translationData, texts, targetLanguage, sourceLanguage, targetAudience, industry, region);
+            return formatTranslationResult(translationData, texts, targetLanguages, sourceLanguage, targetAudience, industry, region);
           }
           return jobResult;
         } else {
           // Regular synchronous result
-          return formatTranslationResult(parsed, texts, targetLanguage, sourceLanguage, targetAudience, industry, region);
+          return formatTranslationResult(parsed, texts, targetLanguages, sourceLanguage, targetAudience, industry, region);
         }
       } catch {
         // Not JSON or error parsing - return as-is
@@ -894,17 +885,9 @@ async function handleTranslateFile(args) {
   }
 
   // Normalize targetLanguages - accept both string and array
-  let targetLanguages = rawTargetLanguages;
-  let targetLanguage = undefined;
-
-  if (typeof rawTargetLanguages === 'string') {
-    // Single language provided as string - convert to array for internal processing
-    targetLanguages = [rawTargetLanguages];
-    targetLanguage = rawTargetLanguages;
-  } else if (Array.isArray(rawTargetLanguages) && rawTargetLanguages.length === 1) {
-    // Single language provided as array - extract for backward compatibility
-    targetLanguage = rawTargetLanguages[0];
-  }
+  const targetLanguages = typeof rawTargetLanguages === 'string'
+    ? [rawTargetLanguages]
+    : rawTargetLanguages;
 
   if (!targetLanguages?.length) {
     throw new Error('targetLanguages parameter is required (can be a string for single language or array for multiple languages)');
@@ -939,7 +922,6 @@ async function handleTranslateFile(args) {
   };
 
   // Add optional parameters only if defined
-  if (targetLanguage !== undefined) requestArgs.targetLanguage = targetLanguage;
   if (targetLanguages !== undefined) requestArgs.targetLanguages = targetLanguages;
   if (region !== undefined) requestArgs.region = region;
   if (context !== undefined) requestArgs.context = context;
@@ -1078,14 +1060,15 @@ async function handleTranslateFile(args) {
 }
 
 // Format translation result for consistent output
-function formatTranslationResult(parsedResult, texts, targetLanguage, sourceLanguage, targetAudience, industry, region) {
+function formatTranslationResult(parsedResult, texts, targetLanguages, sourceLanguage, targetAudience, industry, region) {
+  const targetLangsDisplay = Array.isArray(targetLanguages) ? targetLanguages.join(', ') : targetLanguages;
   return {
     translatedTexts: parsedResult?.translatedTexts || [],
     content: [
       {
         type: 'text',
         text: `Translation Results:\n\n` +
-              `🌍 ${parsedResult?.sourceLanguage || sourceLanguage || 'Auto-detected'} → ${parsedResult?.targetLanguage || targetLanguage}\n` +
+              `🌍 ${parsedResult?.sourceLanguage || sourceLanguage || 'Auto-detected'} → ${parsedResult?.targetLanguages?.join(', ') || targetLangsDisplay}\n` +
               `👥 Audience: ${parsedResult?.targetAudience || targetAudience}\n` +
               `🏭 Industry: ${parsedResult?.industry || industry}\n` +
               `${parsedResult?.region || region ? `📍 Region: ${parsedResult?.region || region}\n` : ''}` +
