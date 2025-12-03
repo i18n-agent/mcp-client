@@ -201,12 +201,150 @@ function detectNodeEnvironment() {
   const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), '.nvm');
   const nodeVersion = process.version;
   const nodePath = process.execPath;
-  
+
   return {
     isNvm: nodePath.includes('.nvm') || nodePath.includes('nvm'),
     nodePath,
     nodeVersion
   };
+}
+
+// Detect if Codex CLI is available
+function isCodexCLIAvailable() {
+  try {
+    execSync('codex --version', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Check if MCP server is already registered in Codex
+function isCodexMCPRegistered(serverName) {
+  try {
+    const result = execSync(`codex mcp get ${serverName}`, { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Install MCP server via Codex CLI native command
+function installViaCodexCLI(existingApiKey = '') {
+  const { mcpClientPath, packageDir } = getMcpClientPaths();
+  const nodeEnv = detectNodeEnvironment();
+
+  // Build the command with env vars
+  const envArgs = [
+    '--env', `MCP_SERVER_URL=https://mcp.i18nagent.ai`
+  ];
+
+  if (existingApiKey) {
+    envArgs.push('--env', `API_KEY=${existingApiKey}`);
+  } else {
+    envArgs.push('--env', 'API_KEY=');
+  }
+
+  // Determine node command - use absolute path for nvm
+  const nodeCmd = nodeEnv.isNvm ? nodeEnv.nodePath : 'node';
+
+  // Remove existing registration if present
+  if (isCodexMCPRegistered('i18n-agent')) {
+    try {
+      execSync('codex mcp remove i18n-agent', { stdio: 'pipe' });
+      console.log('   🔄 Removed existing i18n-agent registration');
+    } catch {
+      // Ignore if removal fails
+    }
+  }
+
+  // Build the full command
+  // codex mcp add [--env KEY=VALUE]... <name> <command> [args...]
+  const cmdParts = [
+    'codex', 'mcp', 'add',
+    ...envArgs,
+    'i18n-agent',
+    nodeCmd,
+    mcpClientPath
+  ];
+
+  // Execute the command
+  execSync(cmdParts.join(' '), {
+    cwd: packageDir,
+    stdio: 'pipe'
+  });
+
+  return true;
+}
+
+// Detect if Claude Code CLI is available
+function isClaudeCodeCLIAvailable() {
+  try {
+    execSync('claude mcp list', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Check if MCP server is already registered in Claude Code CLI
+function isClaudeCodeMCPRegistered(serverName) {
+  try {
+    execSync(`claude mcp get ${serverName}`, { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Install MCP server via Claude Code CLI native command
+function installViaClaudeCodeCLI(existingApiKey = '', scope = 'user') {
+  const { mcpClientPath } = getMcpClientPaths();
+  const nodeEnv = detectNodeEnvironment();
+
+  // Determine node command - use absolute path for nvm
+  const nodeCmd = nodeEnv.isNvm ? nodeEnv.nodePath : 'node';
+
+  // Remove existing registration if present
+  if (isClaudeCodeMCPRegistered('i18n-agent')) {
+    try {
+      execSync(`claude mcp remove --scope ${scope} i18n-agent`, { stdio: 'pipe' });
+      console.log('   🔄 Removed existing i18n-agent registration');
+    } catch {
+      // Ignore if removal fails
+    }
+  }
+
+  // Build env args using -e format (Claude uses -e, not --env)
+  // Note: -e args must come AFTER the server name
+  const envArgs = [
+    '-e', `MCP_SERVER_URL=https://mcp.i18nagent.ai`
+  ];
+
+  if (existingApiKey) {
+    envArgs.push('-e', `API_KEY=${existingApiKey}`);
+  } else {
+    envArgs.push('-e', 'API_KEY=');
+  }
+
+  // Build the full command
+  // claude mcp add --transport stdio --scope user <name> -e KEY=VALUE -- <command> [args...]
+  // Note: <name> must come BEFORE -e options
+  const cmdParts = [
+    'claude', 'mcp', 'add',
+    '--transport', 'stdio',
+    '--scope', scope,
+    'i18n-agent',  // Name must come before -e options
+    ...envArgs,
+    '--',  // Separator for command arguments
+    nodeCmd,
+    mcpClientPath
+  ];
+
+  // Execute the command
+  execSync(cmdParts.join(' '), { stdio: 'pipe' });
+
+  return true;
 }
 
 function createWrapperScript(targetDir) {
@@ -448,11 +586,95 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
     const idesWithApiKey = [];
     const idesNeedingApiKey = [];
 
+    // Check if native CLIs are available
+    const codexCLIAvailable = isCodexCLIAvailable();
+    const claudeCodeCLIAvailable = isClaudeCodeCLIAvailable();
+
+    if (codexCLIAvailable || claudeCodeCLIAvailable) {
+      console.log('🔧 Native CLI support detected:');
+      if (claudeCodeCLIAvailable) {
+        console.log('   - Claude Code CLI (`claude mcp add`)');
+      }
+      if (codexCLIAvailable) {
+        console.log('   - Codex CLI (`codex mcp add`)');
+      }
+      console.log('');
+    }
+
     for (const ide of availableIDEs) {
       try {
         console.log(`⚙️  Configuring ${ide.name}...`);
 
         let result;
+
+        // Special handling for Claude Code CLI - use native CLI if available
+        if (ide.key === 'claude-code' && claudeCodeCLIAvailable) {
+          // Get existing API key from config file if present
+          let existingApiKey = '';
+          if (fs.existsSync(ide.configPath)) {
+            try {
+              const content = fs.readFileSync(ide.configPath, 'utf8');
+              const config = JSON.parse(content);
+              existingApiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY || '';
+            } catch {
+              // Ignore parse errors
+            }
+          }
+
+          try {
+            installViaClaudeCodeCLI(existingApiKey);
+            console.log(`✅ ${ide.name} configured via native CLI!`);
+            console.log(`   Run 'claude mcp list' to verify\n`);
+            installCount++;
+            installedIDEs.push(ide);
+
+            // Track API key status
+            if (existingApiKey) {
+              idesWithApiKey.push(ide);
+            } else {
+              idesNeedingApiKey.push(ide);
+            }
+            continue;
+          } catch (cliError) {
+            console.log(`   ⚠️  Native CLI failed, falling back to config file...`);
+            // Fall through to config file method
+          }
+        }
+
+        // Special handling for Codex - use native CLI if available
+        if (ide.key === 'codex' && codexCLIAvailable) {
+          // Get existing API key from config file if present
+          let existingApiKey = '';
+          if (fs.existsSync(ide.configPath)) {
+            try {
+              const content = fs.readFileSync(ide.configPath, 'utf8');
+              const config = JSON.parse(content);
+              existingApiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY || '';
+            } catch {
+              // Ignore parse errors
+            }
+          }
+
+          try {
+            installViaCodexCLI(existingApiKey);
+            console.log(`✅ ${ide.name} configured via native CLI!`);
+            console.log(`   Run 'codex mcp list' to verify\n`);
+            installCount++;
+            installedIDEs.push(ide);
+
+            // Track API key status
+            if (existingApiKey) {
+              idesWithApiKey.push(ide);
+            } else {
+              idesNeedingApiKey.push(ide);
+            }
+            continue;
+          } catch (cliError) {
+            console.log(`   ⚠️  Native CLI failed, falling back to config file...`);
+            // Fall through to config file method
+          }
+        }
+
         if (ide.key === 'claude' || ide.key === 'claude-code') {
           result = updateClaudeConfig(ide.configPath, ide.key);
         } else {
@@ -495,6 +717,12 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
         });
         console.log('');
 
+        // Check if CLIs need API key
+        const codexNeedsKey = idesNeedingApiKey.some(ide => ide.key === 'codex');
+        const claudeCodeNeedsKey = idesNeedingApiKey.some(ide => ide.key === 'claude-code');
+        const showCodexInstructions = codexNeedsKey && codexCLIAvailable;
+        const showClaudeCodeInstructions = claudeCodeNeedsKey && claudeCodeCLIAvailable;
+
         // Show setup instructions only for IDEs that need them
         console.log(`🔑 Setup Instructions
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -503,7 +731,25 @@ Step 1: Get your API key
    👉 Sign up or log in
    👉 Copy your API key (starts with "i18n_")
 
-Step 2: Add API key to the config file
+Step 2: Add API key to your IDE`);
+
+        if (showClaudeCodeInstructions) {
+          console.log(`
+   For Claude Code CLI (recommended):
+   claude mcp remove --scope user i18n-agent
+   claude mcp add --transport stdio --scope user i18n-agent -e MCP_SERVER_URL=https://mcp.i18nagent.ai -e API_KEY=your_key_here -- node ~/.claude/mcp-servers/i18n-agent/mcp-client.js
+`);
+        }
+
+        if (showCodexInstructions) {
+          console.log(`
+   For Codex CLI (recommended):
+   codex mcp remove i18n-agent
+   codex mcp add --env MCP_SERVER_URL=https://mcp.i18nagent.ai --env API_KEY=your_key_here i18n-agent node ~/.claude/mcp-servers/i18n-agent/mcp-client.js
+`);
+        }
+
+        console.log(`   For config file method:
    Open the config file and edit the "API_KEY" field:
 
    "mcpServers": {
