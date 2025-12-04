@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.9.1';
+const MCP_CLIENT_VERSION = '1.9.2';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -144,7 +144,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'translate_file',
-        description: 'Translate file content while preserving structure and format. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. Always returns a jobId for async processing - use check_translation_status to monitor progress and download_translations to get results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
+        description: 'Translate file content while preserving structure and format. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. Always returns a jobId for async processing - use check_translation_status to monitor progress and download_translations to get results. Set pseudoTranslation=true for testing i18n implementations without AI cost. TOKEN-SAVING TIP: After receiving the jobId, run check_translation_status in background (using run_in_background parameter) to avoid blocking the conversation and reduce token usage from repeated status polling.',
         inputSchema: {
           type: 'object',
           properties: {
