@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.9.2';
+const MCP_CLIENT_VERSION = '1.9.3';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -1828,8 +1828,6 @@ async function handleDownloadTranslations(args) {
       parsedResult = result;
     }
 
-    // Detect storage type and handle accordingly
-    const storageType = parsedResult.storageType || 'local';
     const outputDir = `/tmp/i18n-translations-${jobId}`;
 
     // Create output directory
@@ -1839,8 +1837,8 @@ async function handleDownloadTranslations(args) {
 
     const filesWritten = [];
 
-    if (storageType === 's3' && parsedResult.downloadUrls) {
-      // Case 1: S3 Storage - download files from presigned URLs
+    if (parsedResult.downloadUrls && Object.keys(parsedResult.downloadUrls).length > 0) {
+      // Download files from S3 presigned URLs
       console.error(`📥 Downloading ${Object.keys(parsedResult.downloadUrls).length} translation files from S3...`);
 
       for (const [language, downloadUrl] of Object.entries(parsedResult.downloadUrls)) {
@@ -1896,7 +1894,7 @@ async function handleDownloadTranslations(args) {
       }
     } else {
       // No valid download method found
-      throw new Error(`No translations available. Storage type: ${storageType}. Expected either downloadUrls (S3) or translations (raw content).`);
+      throw new Error(`No translations available. Expected downloadUrls in response.`);
     }
 
     // Return success with file paths
@@ -1908,10 +1906,9 @@ async function handleDownloadTranslations(args) {
           jobId,
           outputDirectory: outputDir,
           filesWritten,
-          storageType,
           fileName: parsedResult.fileName,
           targetLanguages: parsedResult.targetLanguages,
-          message: `✅ ${storageType === 's3' ? 'Downloaded' : 'Wrote'} ${filesWritten.length} translation files to ${outputDir}`
+          message: `✅ Downloaded ${filesWritten.length} translation files to ${outputDir}`
         }, null, 2)
       }]
     };
@@ -2172,7 +2169,7 @@ async function handleParallelDocumentUpload(args) {
     return {
       content: [{
         type: 'text',
-        text: `✅ Parallel Document Upload Successful\n\n` +
+        text: `✅ Translation Upload Successful\n\n` +
               `📂 Namespace: ${finalNamespace}\n` +
               `📄 Source: ${sourceFilePath ? path.basename(sourceFilePath) : 'source content'}\n` +
               `📄 Target: ${targetFilePath ? path.basename(targetFilePath) : 'target content'}\n` +
