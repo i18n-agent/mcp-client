@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.9.3';
+const MCP_CLIENT_VERSION = '1.9.4';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -966,22 +966,35 @@ async function handleTranslateFile(args) {
 
     // Check if we got an async job response
     const result = response.data.result;
-    
+
     if (result && result.content && result.content[0]) {
       const textContent = result.content[0].text;
-      
+
       // Try to parse as JSON to check for job ID
       try {
         const parsed = JSON.parse(textContent);
-        if (parsed.status === 'processing' && parsed.jobId) {
-          // Async job started - poll for status
-          return await pollTranslationJob(parsed.jobId, parsed.estimatedTime);
+
+        // Check for queued/processing status - return with prominent background monitoring instruction
+        // DO NOT auto-poll here - let the consumer handle monitoring in background to save tokens
+        if ((parsed.status === 'queued' || parsed.status === 'processing') && parsed.jobId) {
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                status: parsed.status,
+                jobId: parsed.jobId,
+                message: `⚠️ IMPORTANT: Monitor this job in background to avoid token waste from polling.\n\nDo NOT poll check_translation_status in a loop. Use async/background execution instead.`,
+                estimatedTime: parsed.estimatedTime,
+                fileSize: parsed.fileSize
+              }, null, 2)
+            }]
+          };
         }
       } catch {
         // Not JSON or not an async response, return as-is
       }
     }
-    
+
     return result;
     
   } catch (error) {
