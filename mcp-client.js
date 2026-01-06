@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.9.4';
+const MCP_CLIENT_VERSION = '1.9.5';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -362,7 +362,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'download_translations',
-        description: 'Download completed translations by writing them to /tmp/i18n-translations-{jobId}/. Returns metadata with file paths instead of large translation content to avoid token bloat. Consumer can then read or copy files as needed.',
+        description: 'Download completed translations to /tmp/i18n-translations-{jobId}/. Returns file paths and action_required field. IMPORTANT: After downloading, copy each {lang}.json file to the correct locale folder matching the source file structure (e.g., if source was locales/en/messages.json, copy to locales/{lang}/messages.json).',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1910,7 +1910,7 @@ async function handleDownloadTranslations(args) {
       throw new Error(`No translations available. Expected downloadUrls in response.`);
     }
 
-    // Return success with file paths
+    // Return success with file paths and instructions for consumer
     return {
       content: [{
         type: 'text',
@@ -1921,7 +1921,8 @@ async function handleDownloadTranslations(args) {
           filesWritten,
           fileName: parsedResult.fileName,
           targetLanguages: parsedResult.targetLanguages,
-          message: `✅ Downloaded ${filesWritten.length} translation files to ${outputDir}`
+          message: `✅ Downloaded ${filesWritten.length} translation files to ${outputDir}`,
+          action_required: `Copy each translated file to its correct locale folder. Common patterns: locales/{lang}/${parsedResult.fileName || 'file.json'}, locales/{lang}.json, or {filename}.{lang}.json. Match the source file's directory structure.`
         }, null, 2)
       }]
     };
