@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.9.6';
+const MCP_CLIENT_VERSION = '1.9.7';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -49,7 +49,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: 'translate_text',
-        description: 'Translate text content with cultural adaptation using AI subagents. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). For large requests (>100 texts or >50,000 characters), returns a jobId for async processing. Use check_translation_status to monitor progress and download results. Set pseudoTranslation=true for testing i18n implementations without AI cost.',
+        description: 'Translate text content with cultural adaptation using AI subagents. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). For large requests (>100 texts or >50,000 characters), returns a jobId for async processing. Use check_translation_status to monitor progress and download results. Set pseudoTranslation=true for testing i18n implementations without AI cost. CRITICAL: If a previous translation job failed with "quality problems" or "Retrying might encounter the same problem", do NOT automatically retry. Stop and report the failure to the user first - retrying may waste credits.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -144,7 +144,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'translate_file',
-        description: 'Translate file content while preserving structure and format. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. Always returns a jobId for async processing - use check_translation_status to monitor progress and download_translations to get results. Set pseudoTranslation=true for testing i18n implementations without AI cost. TOKEN-SAVING TIP: After receiving the jobId, use the Task tool with run_in_background=true to spawn an agent that monitors the job via check_translation_status, rather than polling directly in the conversation.',
+        description: 'Translate file content while preserving structure and format. Supports single or multi-language translation via targetLanguages parameter (string for single, array for multiple). Supports JSON, YAML, XML, CSV, TXT, MD, and other text files. Always returns a jobId for async processing - use check_translation_status to monitor progress and download_translations to get results. Set pseudoTranslation=true for testing i18n implementations without AI cost. TOKEN-SAVING TIP: After receiving the jobId, use the Task tool with run_in_background=true to spawn an agent that monitors the job via check_translation_status, rather than polling directly in the conversation. CRITICAL: If a previous translation job failed with "quality problems" or "Retrying might encounter the same problem", do NOT automatically retry. Stop and report the failure to the user first - retrying may waste credits.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -326,7 +326,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
        */
       {
         name: 'check_translation_status',
-        description: 'Check the status and progress of an async translation job. Returns progress percentage, elapsed time, and downloads completed translation results when finished. Supports cursor-based pagination for download URLs to reduce token usage when checking jobs with many languages (recommended for jobs with >10 languages).',
+        description: 'Check the status and progress of an async translation job. Returns progress percentage, elapsed time, and downloads completed translation results when finished. Supports cursor-based pagination for download URLs to reduce token usage when checking jobs with many languages (recommended for jobs with >10 languages). CRITICAL: If a job fails with "quality problems" or any error stating "Retrying might encounter the same problem", do NOT automatically retry. Stop and report the failure to the user. Let them decide the next action - retrying may waste credits on repeated failures.',
         inputSchema: {
           type: 'object',
           properties: {
