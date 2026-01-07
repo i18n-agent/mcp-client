@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.9.7';
+const MCP_CLIENT_VERSION = '1.9.8';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -326,7 +326,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
        */
       {
         name: 'check_translation_status',
-        description: 'Check the status and progress of an async translation job. Returns progress percentage, elapsed time, and downloads completed translation results when finished. Supports cursor-based pagination for download URLs to reduce token usage when checking jobs with many languages (recommended for jobs with >10 languages). CRITICAL: If a job fails with "quality problems" or any error stating "Retrying might encounter the same problem", do NOT automatically retry. Stop and report the failure to the user. Let them decide the next action - retrying may waste credits on repeated failures.',
+        description: 'Check async translation job status. Returns JSON with: status, progress (0-100%), elapsedTime, completedLanguages, and downloadUrls. IMPORTANT: Always report the progress percentage to the user (e.g., "Translation is 45% complete"). Supports cursor-based pagination for download URLs (recommended for jobs with >10 languages). CRITICAL: If a job fails with "quality problems" or "Retrying might encounter the same problem", do NOT automatically retry - stop and report the failure to the user first.',
         inputSchema: {
           type: 'object',
           properties: {
