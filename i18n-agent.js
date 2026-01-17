@@ -5,7 +5,7 @@
  * Integrates with Claude Code CLI to provide translation capabilities
  */
 
-const MCP_CLIENT_VERSION = '1.9.8';
+const MCP_CLIENT_VERSION = '1.11.0';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -42,6 +42,40 @@ if (!process.env.API_KEY) {
 }
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL;
 const API_KEY = process.env.API_KEY;
+
+// Heavy load detection - matches error message from service-mcp error-message-sanitizer
+// Exact message: 'Our system is under heavy load, please resume your job later.'
+const HEAVY_LOAD_PATTERNS = [
+  /Our system is under heavy load/i,
+  /system is under heavy load.*resume.*later/i,
+];
+
+const HEAVY_LOAD_MESSAGE = `⏳ System under heavy load
+
+The translation service is experiencing high demand. Your job has been saved and can be resumed later.
+
+⚠️ IMPORTANT FOR AI AGENTS:
+• Do NOT retry or resume immediately - this will likely fail again
+• Do NOT poll check_translation_status repeatedly
+• Wait at least 5-10 minutes before attempting to resume
+• The job is saved - no data is lost
+
+🔄 To resume later:
+1. Wait for system load to decrease (5-10 minutes minimum)
+2. Use resume_translation with the same jobId
+3. If it fails again, wait longer before retrying
+
+💡 Tip: Inform the user about the delay and let them decide when to retry.`;
+
+/**
+ * Check if an error message indicates heavy system load
+ * @param {string} errorMessage - The error message to check
+ * @returns {boolean} - True if the error indicates heavy load
+ */
+function isHeavyLoadError(errorMessage) {
+  if (!errorMessage) return false;
+  return HEAVY_LOAD_PATTERNS.some(pattern => pattern.test(errorMessage));
+}
 
 // Available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -689,26 +723,35 @@ async function handleTranslateText(args) {
       throw new Error(errorMsg);
     }
     
+    // Check for heavy load error (from service-mcp error-message-sanitizer)
+    const errorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                        error.response?.data?.error?.message ||
+                        error.response?.data?.message ||
+                        error.message;
+    if (isHeavyLoadError(errorDetails)) {
+      throw new Error(`${HEAVY_LOAD_MESSAGE}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`);
+    }
+
     // Check if it's actually a service unavailable error (only for real infrastructure issues)
     if (error.response?.status === 503) {
       throw new Error(`i18n-agent encountered unexpected problem, and we are working on it, try again later.`);
     }
-    
-    if (error.code === 'ECONNREFUSED' || 
-        error.code === 'ETIMEDOUT' || 
+
+    if (error.code === 'ECONNREFUSED' ||
+        error.code === 'ETIMEDOUT' ||
         error.code === 'ENOTFOUND' ||
         error.response?.status === 502 ||
         error.response?.status === 504) {
-      const serviceErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
-                                  error.response?.data?.error?.message || 
+      const serviceErrorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                                  error.response?.data?.error?.message ||
                                   error.message;
       const debugInfo = `Code: ${error.code || 'N/A'}\nStatus: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${serviceErrorDetails}\nURL: ${error.config?.url || 'N/A'}\nTimestamp: ${new Date().toISOString()}`;
       throw new Error(`Translation service error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`);
     }
-    
+
     // For other errors, include all debug info in the error message
-    const generalErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
-                               error.response?.data?.error?.message || 
+    const generalErrorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                               error.response?.data?.error?.message ||
                                error.message;
     const debugInfo = `Status: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${generalErrorDetails}\nTimestamp: ${new Date().toISOString()}`;
     throw new Error(`Error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_text]`);
@@ -1046,26 +1089,31 @@ async function handleTranslateFile(args) {
       throw new Error(errorMsg);
     }
     
+    // Check for heavy load error (from service-mcp error-message-sanitizer)
+    if (isHeavyLoadError(timeoutErrorDetails)) {
+      throw new Error(`${HEAVY_LOAD_MESSAGE}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`);
+    }
+
     // Check if it's actually a service unavailable error (only for real infrastructure issues)
     if (error.response?.status === 503 && content.length <= 50000) {
       throw new Error(`i18n-agent encountered unexpected problem, and we are working on it, try again later.`);
     }
-    
-    if (error.code === 'ECONNREFUSED' || 
-        error.code === 'ETIMEDOUT' || 
+
+    if (error.code === 'ECONNREFUSED' ||
+        error.code === 'ETIMEDOUT' ||
         error.code === 'ENOTFOUND' ||
         error.response?.status === 502 ||
         error.response?.status === 504) {
-      const serviceErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
-                                  error.response?.data?.error?.message || 
+      const serviceErrorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                                  error.response?.data?.error?.message ||
                                   error.message;
       const debugInfo = `Code: ${error.code || 'N/A'}\nStatus: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${serviceErrorDetails}\nURL: ${error.config?.url || 'N/A'}\nTimestamp: ${new Date().toISOString()}`;
       throw new Error(`Translation service error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`);
     }
-    
+
     // For other errors, include all debug info in the error message
-    const finalErrorDetails = error.response?.data?.result?.content?.[0]?.text || 
-                              error.response?.data?.error?.message || 
+    const finalErrorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                              error.response?.data?.error?.message ||
                               error.message;
     const debugInfo = `Status: ${error.response?.status || 'N/A'}\nStatusText: ${error.response?.statusText || 'N/A'}\nDetails: ${finalErrorDetails}\nTimestamp: ${new Date().toISOString()}`;
     throw new Error(`Error\n${debugInfo}\n[MCP v${MCP_CLIENT_VERSION}/STDIO/translate_file]`);
@@ -1122,48 +1170,64 @@ async function pollTranslationJob(jobId, estimatedTime) {
       
       if (response.data.error) {
         const errorMsg = response.data.error.message || response.data.error;
-        const isAuthError = errorMsg.toString().toLowerCase().includes('api key') || 
+
+        // Check for heavy load error - stop polling immediately
+        if (isHeavyLoadError(errorMsg.toString())) {
+          throw new Error(`${HEAVY_LOAD_MESSAGE}\n\nJob ID: ${jobId}\n[MCP v${MCP_CLIENT_VERSION}/pollTranslationJob]`);
+        }
+
+        const isAuthError = errorMsg.toString().toLowerCase().includes('api key') ||
                            errorMsg.toString().toLowerCase().includes('api_key') ||
                            errorMsg.toString().toLowerCase().includes('unauthorized');
-        const isCreditError = errorMsg.toString().toLowerCase().includes('credit') || 
+        const isCreditError = errorMsg.toString().toLowerCase().includes('credit') ||
                              errorMsg.toString().toLowerCase().includes('quota') ||
                              errorMsg.toString().toLowerCase().includes('limit exceeded');
-        
+
         let finalErrorMsg = `Status check error: ${errorMsg}`;
         if (!isAuthError && !isCreditError) {
           finalErrorMsg += `. Please retry with a smaller chunk or split the content into multiple requests.`;
         }
         throw new Error(finalErrorMsg);
       }
-      
+
       const result = response.data.result;
       if (result && result.content && result.content[0]) {
         const status = JSON.parse(result.content[0].text);
-        
+
         if (status.status === 'completed') {
           return status.result;
         } else if (status.status === 'failed') {
           const errorMsg = status.error;
-          const isAuthError = errorMsg.toString().toLowerCase().includes('api key') || 
+
+          // Check for heavy load error - stop polling immediately
+          if (isHeavyLoadError(errorMsg.toString())) {
+            throw new Error(`${HEAVY_LOAD_MESSAGE}\n\nJob ID: ${jobId}\n[MCP v${MCP_CLIENT_VERSION}/pollTranslationJob]`);
+          }
+
+          const isAuthError = errorMsg.toString().toLowerCase().includes('api key') ||
                              errorMsg.toString().toLowerCase().includes('api_key') ||
                              errorMsg.toString().toLowerCase().includes('unauthorized');
-          const isCreditError = errorMsg.toString().toLowerCase().includes('credit') || 
+          const isCreditError = errorMsg.toString().toLowerCase().includes('credit') ||
                                errorMsg.toString().toLowerCase().includes('quota') ||
                                errorMsg.toString().toLowerCase().includes('limit exceeded');
-          
+
           let finalErrorMsg = `Translation failed: ${errorMsg}`;
           if (!isAuthError && !isCreditError) {
             finalErrorMsg += `. Please retry with a smaller chunk or split the content into multiple requests.`;
           }
           throw new Error(finalErrorMsg);
         }
-        
+
         // Still processing - continue polling
         console.error(`Translation progress: ${status.progress}% (${status.message})`);
       }
     } catch (error) {
+      // Check for heavy load error - stop polling immediately (don't continue)
+      if (isHeavyLoadError(error.message)) {
+        throw error; // Re-throw heavy load error to stop polling
+      }
       console.error(`Error polling job status: ${error.message}`);
-      // Continue polling even if status check fails
+      // Continue polling for other transient errors
     }
   }
   
@@ -1727,6 +1791,17 @@ async function handleCheckTranslationStatus(args) {
   } catch (error) {
     console.error('Check translation status error:', error);
 
+    // Extract error message from various response formats
+    const errorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                        error.response?.data?.error?.message ||
+                        error.response?.data?.message ||
+                        error.message;
+
+    // Check for heavy load error (from service-mcp error-message-sanitizer)
+    if (isHeavyLoadError(errorDetails)) {
+      throw new Error(`${HEAVY_LOAD_MESSAGE}\n\nJob ID: ${jobId}\n[MCP v${MCP_CLIENT_VERSION}/check_translation_status]`);
+    }
+
     // Handle 503 service unavailable
     if (error.response?.status === 503) {
       throw new Error(`i18n-agent encountered unexpected problem, and we are working on it, try again later.`);
@@ -1778,6 +1853,17 @@ async function handleResumeTranslation(args) {
     return response.data.result;
   } catch (error) {
     console.error('Resume translation error:', error);
+
+    // Extract error message from various response formats
+    const errorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                        error.response?.data?.error?.message ||
+                        error.response?.data?.message ||
+                        error.message;
+
+    // Check for heavy load error (from service-mcp error-message-sanitizer)
+    if (isHeavyLoadError(errorDetails)) {
+      throw new Error(`${HEAVY_LOAD_MESSAGE}\n\nJob ID: ${jobId}\n[MCP v${MCP_CLIENT_VERSION}/resume_translation]`);
+    }
 
     // Handle 503 service unavailable
     if (error.response?.status === 503) {
@@ -1929,6 +2015,17 @@ async function handleDownloadTranslations(args) {
 
   } catch (error) {
     console.error('Download translations error:', error);
+
+    // Extract error message from various response formats
+    const errorDetails = error.response?.data?.result?.content?.[0]?.text ||
+                        error.response?.data?.error?.message ||
+                        error.response?.data?.message ||
+                        error.message;
+
+    // Check for heavy load error (from service-mcp error-message-sanitizer)
+    if (isHeavyLoadError(errorDetails)) {
+      throw new Error(`${HEAVY_LOAD_MESSAGE}\n\nJob ID: ${jobId}\n[MCP v${MCP_CLIENT_VERSION}/download_translations]`);
+    }
 
     // Handle 503 service unavailable
     if (error.response?.status === 503) {

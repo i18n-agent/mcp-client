@@ -34,7 +34,7 @@ npm test
 node install.js
 
 # Test MCP client syntax
-node -c mcp-client.js
+node -c i18n-agent.js
 ```
 
 ## 📝 Types of Contributions
@@ -72,7 +72,7 @@ npm test
 node install.js
 
 # Check for syntax errors
-node -c mcp-client.js
+node -c i18n-agent.js
 node -c install.js
 ```
 

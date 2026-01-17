@@ -34,7 +34,7 @@ Object.entries(IDE_CONFIGS).forEach(([key, config]) => {
 // Test 3: File validation
 console.log('\nTest 3: File Validation');
 const requiredFiles = [
-  'mcp-client.js',
+  'i18n-agent.js',
   'install.js', 
   'package.json',
   'README.md',
@@ -65,7 +65,7 @@ console.log('\nTest 5: MCP Client Syntax');
 try {
   // Try to import the module (syntax check)
   const { readFileSync } = fs;
-  const mcpClientCode = readFileSync('mcp-client.js', 'utf8');
+  const mcpClientCode = readFileSync('i18n-agent.js', 'utf8');
   
   // Basic checks
   const hasShebang = mcpClientCode.startsWith('#!/usr/bin/env node');

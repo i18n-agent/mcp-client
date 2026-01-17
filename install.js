@@ -83,9 +83,9 @@ Features:
 const getMcpClientPaths = () => {
   // Instead of using ephemeral npx cache, install to stable location
   const stableDir = path.join(os.homedir(), '.claude', 'mcp-servers', 'i18n-agent');
-  const mcpClientPath = path.join(stableDir, 'mcp-client.js');
+  const mcpClientPath = path.join(stableDir, 'i18n-agent.js');
   const packageDir = stableDir;
-  return { mcpClientPath, packageDir, sourceFile: path.resolve(__dirname, 'mcp-client.js') };
+  return { mcpClientPath, packageDir, sourceFile: path.resolve(__dirname, 'i18n-agent.js') };
 };
 
 function copyMcpClientToStableLocation() {
@@ -94,7 +94,7 @@ function copyMcpClientToStableLocation() {
   // Create stable directory
   fs.mkdirSync(paths.packageDir, { recursive: true });
 
-  // Copy mcp-client.js to stable location
+  // Copy i18n-agent.js to stable location
   fs.copyFileSync(paths.sourceFile, paths.mcpClientPath);
 
   // Copy package.json to stable location
@@ -808,7 +808,7 @@ Step 2: Add API key to your IDE`);
           console.log(`
    For Claude Code CLI (recommended):
    claude mcp remove --scope user i18n-agent
-   claude mcp add --transport stdio --scope user i18n-agent -e MCP_SERVER_URL=https://mcp.i18nagent.ai -e API_KEY=your_key_here -- node ~/.claude/mcp-servers/i18n-agent/mcp-client.js
+   claude mcp add --transport stdio --scope user i18n-agent -e MCP_SERVER_URL=https://mcp.i18nagent.ai -e API_KEY=your_key_here -- node ~/.claude/mcp-servers/i18n-agent/i18n-agent.js
 `);
         }
 
@@ -816,7 +816,7 @@ Step 2: Add API key to your IDE`);
           console.log(`
    For Codex CLI (recommended):
    codex mcp remove i18n-agent
-   codex mcp add --env MCP_SERVER_URL=https://mcp.i18nagent.ai --env API_KEY=your_key_here i18n-agent node ~/.claude/mcp-servers/i18n-agent/mcp-client.js
+   codex mcp add --env MCP_SERVER_URL=https://mcp.i18nagent.ai --env API_KEY=your_key_here i18n-agent node ~/.claude/mcp-servers/i18n-agent/i18n-agent.js
 `);
         }
 
@@ -873,7 +873,7 @@ Try these commands in your AI IDE:
 const isMainModule = process.argv[1] && (
   import.meta.url === `file://${process.argv[1]}` ||
   import.meta.url.endsWith(process.argv[1]) ||
-  process.argv[1].includes('mcp-client')
+  process.argv[1].includes('i18n-agent')
 );
 
 if (isMainModule) {

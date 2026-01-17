@@ -20,7 +20,7 @@ Professional translation service client for Claude, Cursor, VS Code, and other A
 
 ```bash
 npm install -g @i18n-agent/mcp-client
-mcp-client
+i18n-agent
 ```
 
 **Note:** Global installation is required due to npm bin naming limitations. The installer will detect all available AI IDEs and configure them automatically.
@@ -156,7 +156,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "i18n-agent": {
       "command": "node",
-      "args": ["/path/to/mcp-client.js"],
+      "args": ["/path/to/i18n-agent.js"],
       "env": {
         "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
         "API_KEY": "your-api-key-here"
@@ -174,7 +174,7 @@ Create `.cursor/mcp_settings.json` or `.vscode/mcp_settings.json`:
   "mcpServers": {
     "i18n-agent": {
       "command": "node", 
-      "args": ["/path/to/mcp-client.js"],
+      "args": ["/path/to/i18n-agent.js"],
       "env": {
         "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
         "API_KEY": "your-api-key-here"
@@ -252,7 +252,7 @@ This usually happens with Node Version Managers (nvm, fnm, n). The installer now
    #!/bin/bash
    export PATH="$(dirname $(which node)):$PATH"
    cd ~/.claude
-   exec node node_modules/@i18n-agent/mcp-client/mcp-client.js
+   exec node node_modules/@i18n-agent/mcp-client/i18n-agent.js
    ```
    
    Make it executable:
