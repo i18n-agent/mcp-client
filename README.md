@@ -1,6 +1,6 @@
 # 🌍 i18n-agent MCP Client
 
-Professional translation service client for Claude, Cursor, VS Code, and other AI IDEs using the Model Context Protocol (MCP).
+Professional translation service client for Claude, Cursor, VS Code, Antigravity, and other AI IDEs using the Model Context Protocol (MCP).
 
 [![npm version](https://badge.fury.io/js/%40i18n-agent%2Fmcp-client.svg)](https://www.npmjs.com/package/@i18n-agent/mcp-client)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -77,6 +77,7 @@ Analyze "Hello world! This is a test." for translation to Spanish
 | **Cursor** | ✅ Auto-configured | `~/.cursor/mcp_settings.json` | `~/.cursor/mcp_settings.json` | `~/.cursor/mcp_settings.json` |
 | **VS Code** | ✅ Auto-configured | `~/.vscode/mcp_settings.json` | `~/.vscode/mcp_settings.json` | `~/.vscode/mcp_settings.json` |
 | **Codex (OpenAI)** | ✅ Auto-configured | `~/.codex/mcp_settings.json` | `~/.codex/mcp_settings.json` | `~/.codex/mcp_settings.json` |
+| **Antigravity (Google)** | ✅ Auto-configured | `~/.gemini/antigravity/mcp_config.json` | `%USERPROFILE%\.gemini\antigravity\mcp_config.json` | `~/.config/antigravity/mcp_config.json` |
 
 **Note:** The installer automatically detects your platform and uses the correct config paths.
 

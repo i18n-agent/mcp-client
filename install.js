@@ -37,8 +37,32 @@ function getClaudeDesktopPath() {
   }
 }
 
+function getAntigravityPath() {
+  const platform = process.platform;
+  if (platform === 'darwin') {
+    // macOS
+    return {
+      configPath: path.join(os.homedir(), '.gemini/antigravity/mcp_config.json'),
+      displayPath: '~/.gemini/antigravity/mcp_config.json'
+    };
+  } else if (platform === 'win32') {
+    // Windows
+    return {
+      configPath: path.join(os.homedir(), '.gemini/antigravity/mcp_config.json'),
+      displayPath: '%USERPROFILE%\\.gemini\\antigravity\\mcp_config.json'
+    };
+  } else {
+    // Linux
+    return {
+      configPath: path.join(os.homedir(), '.config/antigravity/mcp_config.json'),
+      displayPath: '~/.config/antigravity/mcp_config.json'
+    };
+  }
+}
+
 // Supported IDE configurations
 const claudePaths = getClaudeDesktopPath();
+const antigravityPaths = getAntigravityPath();
 const IDE_CONFIGS = {
   claude: {
     name: 'Claude Desktop',
@@ -64,6 +88,11 @@ const IDE_CONFIGS = {
     name: 'Codex (OpenAI)',
     configPath: path.join(os.homedir(), '.codex/mcp_settings.json'),
     displayPath: '~/.codex/mcp_settings.json'
+  },
+  antigravity: {
+    name: 'Antigravity (Google)',
+    configPath: antigravityPaths.configPath,
+    displayPath: antigravityPaths.displayPath
   }
 };
 
@@ -598,6 +627,7 @@ Supported IDEs:
 - Cursor
 - VS Code (with MCP extension)
 - Codex (OpenAI)
+- Antigravity (Google)
 
 Manual setup:
 1. Create the configuration file for your IDE
