@@ -139,7 +139,7 @@ function copyMcpClientToStableLocation() {
   // Install dependencies
   console.log(`   📦 Installing dependencies...`);
   try {
-    execSync('npm install --production --silent', {
+    execSync('npm install --omit=dev --ignore-scripts --silent', {
       cwd: paths.packageDir,
       stdio: 'pipe'
     });
@@ -180,6 +180,62 @@ function checkExistingApiKey(configPath) {
   } catch (error) {
     return false;
   }
+}
+
+// Extract actual API key value from a config file
+function extractApiKeyFromConfig(configPath) {
+  if (!fs.existsSync(configPath)) {
+    return '';
+  }
+
+  try {
+    const content = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(content);
+    const apiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY;
+    return (apiKey && apiKey.trim() !== '') ? apiKey.trim() : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+// Find any existing API key from all available IDEs
+function findAnyExistingApiKey(availableIDEs, claudeCodeCLIAvailable = false, codexCLIAvailable = false) {
+  // Check Claude Code CLI first
+  if (claudeCodeCLIAvailable) {
+    const cliKey = getClaudeCodeExistingApiKey('i18n-agent');
+    if (cliKey) {
+      console.log('   🔑 Found existing API key from Claude Code CLI');
+      return cliKey;
+    }
+  }
+
+  // Check Codex CLI
+  if (codexCLIAvailable) {
+    const cliKey = getCodexExistingApiKey('i18n-agent');
+    if (cliKey) {
+      console.log('   🔑 Found existing API key from Codex CLI');
+      return cliKey;
+    }
+  }
+
+  // Check all config files
+  for (const ide of availableIDEs) {
+    const apiKey = extractApiKeyFromConfig(ide.configPath);
+    if (apiKey) {
+      console.log(`   🔑 Found existing API key from ${ide.name}`);
+      return apiKey;
+    }
+  }
+
+  // Also check ~/.claude.json specifically
+  const claudeJsonPath = path.join(os.homedir(), '.claude.json');
+  const claudeJsonKey = extractApiKeyFromConfig(claudeJsonPath);
+  if (claudeJsonKey) {
+    console.log('   🔑 Found existing API key from ~/.claude.json');
+    return claudeJsonKey;
+  }
+
+  return '';
 }
 
 async function checkExistingApiKeys(availableIDEs, claudeCodeCLIAvailable = false, codexCLIAvailable = false) {
@@ -474,7 +530,7 @@ exec node "${mcpClientPath}"`;
   return wrapperPath;
 }
 
-function updateClaudeConfig(configPath, ideKey = 'claude') {
+function updateClaudeConfig(configPath, ideKey = 'claude', sharedApiKey = '') {
   let config = {};
   let existingApiKey = "";
   let hasApiKey = false;
@@ -494,6 +550,13 @@ function updateClaudeConfig(configPath, ideKey = 'claude') {
     } catch (error) {
       console.warn(`Warning: Could not parse existing config at ${configPath}`);
     }
+  }
+
+  // Use shared API key if no existing key found
+  if (!existingApiKey && sharedApiKey) {
+    existingApiKey = sharedApiKey;
+    hasApiKey = true;
+    console.log('   🔄 Using shared API key from another IDE');
   }
 
   // Ensure mcpServers exists
@@ -557,7 +620,7 @@ function updateClaudeConfig(configPath, ideKey = 'claude') {
   return { config, hasApiKey };
 }
 
-function updateGenericMCPConfig(configPath) {
+function updateGenericMCPConfig(configPath, sharedApiKey = '') {
   let config = {};
   let existingApiKey = "";
   let hasApiKey = false;
@@ -576,6 +639,13 @@ function updateGenericMCPConfig(configPath) {
     } catch (error) {
       console.warn(`Warning: Could not parse existing config at ${configPath}`);
     }
+  }
+
+  // Use shared API key if no existing key found
+  if (!existingApiKey && sharedApiKey) {
+    existingApiKey = sharedApiKey;
+    hasApiKey = true;
+    console.log('   🔄 Using shared API key from another IDE');
   }
 
   if (!config.mcpServers) {
@@ -652,6 +722,9 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
     // Check for existing API keys BEFORE installation
     const { withKeys, withoutKeys } = await checkExistingApiKeys(availableIDEs, claudeCodeCLIAvailable, codexCLIAvailable);
 
+    // Find a shared API key from any IDE that has one - will be applied to all IDEs
+    const sharedApiKey = findAnyExistingApiKey(availableIDEs, claudeCodeCLIAvailable, codexCLIAvailable);
+
     if (withKeys.length > 0 && withoutKeys.length === 0) {
       console.log(`✅ API Keys Already Configured:`);
       withKeys.forEach(ide => {
@@ -659,17 +732,24 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
       });
       console.log(`\n💚 Your API keys are preserved. Updating MCP client files only...\n`);
     } else if (withKeys.length > 0 && withoutKeys.length > 0) {
-      // Mixed case: some have keys, some don't
+      // Mixed case: some have keys, some don't - we'll share the key!
       console.log(`✅ API Keys Already Configured:`);
       withKeys.forEach(ide => {
         console.log(`   - ${ide.name}`);
       });
-      console.log(`\n🔑 API Key Setup Required:`);
-      withoutKeys.forEach(ide => {
-        console.log(`   - ${ide.name}`);
-      });
-      console.log(`\n💚 Existing API keys will be preserved.`);
-      console.log(`💡 Get your API key at: https://app.i18nagent.ai\n`);
+      if (sharedApiKey) {
+        console.log(`\n🔄 Will apply existing API key to:`);
+        withoutKeys.forEach(ide => {
+          console.log(`   - ${ide.name}`);
+        });
+        console.log(`\n💚 API key will be shared across all IDEs.\n`);
+      } else {
+        console.log(`\n🔑 API Key Setup Required:`);
+        withoutKeys.forEach(ide => {
+          console.log(`   - ${ide.name}`);
+        });
+        console.log(`\n💡 Get your API key at: https://app.i18nagent.ai\n`);
+      }
     } else if (withoutKeys.length > 0) {
       console.log(`🔑 API Key Setup Required:`);
       withoutKeys.forEach(ide => {
@@ -710,7 +790,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
 
         // Special handling for Claude Code CLI - use native CLI if available
         if (ide.key === 'claude-code' && claudeCodeCLIAvailable) {
-          // Get existing API key - check CLI registration first, then config file
+          // Get existing API key - check CLI registration first, then config file, then use shared key
           let existingApiKey = getClaudeCodeExistingApiKey('i18n-agent');
           if (!existingApiKey && fs.existsSync(ide.configPath)) {
             try {
@@ -720,6 +800,11 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
             } catch {
               // Ignore parse errors
             }
+          }
+          // Use shared API key if no IDE-specific key found
+          if (!existingApiKey && sharedApiKey) {
+            existingApiKey = sharedApiKey;
+            console.log('   🔄 Using shared API key from another IDE');
           }
 
           try {
@@ -744,7 +829,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
 
         // Special handling for Codex - use native CLI if available
         if (ide.key === 'codex' && codexCLIAvailable) {
-          // Get existing API key - check CLI registration first, then config file
+          // Get existing API key - check CLI registration first, then config file, then use shared key
           let existingApiKey = getCodexExistingApiKey('i18n-agent');
           if (!existingApiKey && fs.existsSync(ide.configPath)) {
             try {
@@ -754,6 +839,11 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
             } catch {
               // Ignore parse errors
             }
+          }
+          // Use shared API key if no IDE-specific key found
+          if (!existingApiKey && sharedApiKey) {
+            existingApiKey = sharedApiKey;
+            console.log('   🔄 Using shared API key from another IDE');
           }
 
           try {
@@ -777,9 +867,9 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
         }
 
         if (ide.key === 'claude' || ide.key === 'claude-code') {
-          result = updateClaudeConfig(ide.configPath, ide.key);
+          result = updateClaudeConfig(ide.configPath, ide.key, sharedApiKey);
         } else {
-          result = updateGenericMCPConfig(ide.configPath);
+          result = updateGenericMCPConfig(ide.configPath, sharedApiKey);
         }
 
         console.log(`✅ ${ide.name} configured successfully!`);
