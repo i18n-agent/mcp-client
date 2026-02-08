@@ -29,18 +29,28 @@ i18n-agent
 
 For Claude Code users, you can install directly from the marketplace:
 
+**Step 1: Get your API key**
+- Visit [app.i18nagent.ai](https://app.i18nagent.ai)
+- Sign up or log in
+- Copy your API key (starts with "i18n_")
+
+**Step 2: Set environment variable**
+```bash
+echo 'export API_KEY=your-api-key-here' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Replace `your-api-key-here` with your actual API key.
+
+**Step 3: Install from marketplace**
 ```bash
 /plugin marketplace add i18n-agent/mcp-client
 /plugin install i18n-agent@i18n-agent
 ```
 
-Then set your API key:
+**Step 4: Restart Claude Code**
 
-```bash
-export API_KEY=your-api-key-here
-```
-
-Restart Claude Code and you're ready to go!
+That's it! The plugin will automatically use your API key from the environment variable.
 
 ## 🔑 Setup API Key
 
