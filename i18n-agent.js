@@ -37,11 +37,11 @@ const server = new Server(
 if (!process.env.MCP_SERVER_URL) {
   throw new Error('MCP_SERVER_URL environment variable is required');
 }
-if (!process.env.API_KEY) {
-  throw new Error('API_KEY environment variable is required');
+if (!process.env.I18N_AGENT_API_KEY) {
+  throw new Error('I18N_AGENT_API_KEY environment variable is required');
 }
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL;
-const API_KEY = process.env.API_KEY;
+const I18N_AGENT_API_KEY = process.env.I18N_AGENT_API_KEY;
 
 // Heavy load detection - matches error message from service-mcp error-message-sanitizer
 // Exact message: 'Our system is under heavy load, please resume your job later.'
@@ -609,7 +609,7 @@ async function handleTranslateText(args) {
     params: {
       name: 'translate_text',
       arguments: {
-        apiKey: API_KEY,
+        apiKey: I18N_AGENT_API_KEY,
         texts: texts,
         targetLanguages: targetLanguages,
         sourceLanguage: sourceLanguage && sourceLanguage !== 'auto' ? sourceLanguage : undefined,
@@ -952,7 +952,7 @@ async function handleTranslateFile(args) {
 
   // Build arguments object, filtering out undefined values (they get stripped by JSON.stringify)
   const requestArgs = {
-    apiKey: API_KEY,
+    apiKey: I18N_AGENT_API_KEY,
     filePath,
     fileContent: content,
     fileType,
@@ -1261,7 +1261,7 @@ async function handleAnalyzeContent(args) {
     params: {
       name: 'analyze_content',
       arguments: {
-        apiKey: API_KEY,
+        apiKey: I18N_AGENT_API_KEY,
         content,
         fileType,
         sourceLanguage,
@@ -1312,7 +1312,7 @@ async function handleAnalyzeContent(args) {
 
 async function handleGetCredits(args) {
   const { apiKey } = args;
-  const creditsApiKey = apiKey || API_KEY;
+  const creditsApiKey = apiKey || I18N_AGENT_API_KEY;
 
   // Use MCP JSON-RPC protocol for get_credits
   const mcpRequest = {
@@ -1900,7 +1900,7 @@ async function handleDownloadTranslations(args) {
     params: {
       name: 'download_translations',
       arguments: {
-        apiKey: API_KEY,
+        apiKey: I18N_AGENT_API_KEY,
         jobId
       }
     }
@@ -2151,7 +2151,7 @@ async function handleSingleFileUpload(args) {
       formData,
       {
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
+          'Authorization': `Bearer ${I18N_AGENT_API_KEY}`,
           ...formData.getHeaders()
         },
         timeout: 60000
@@ -2264,7 +2264,7 @@ async function handleParallelDocumentUpload(args) {
       formData,
       {
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
+          'Authorization': `Bearer ${I18N_AGENT_API_KEY}`,
           ...formData.getHeaders()
         },
         timeout: 120000
@@ -2326,7 +2326,7 @@ async function handleListUploadedTranslations(args) {
       `${MCP_SERVER_URL}/namespaces/${namespace}/translations/files?${params.toString()}`,
       {
         headers: {
-          'Authorization': `Bearer ${API_KEY}`
+          'Authorization': `Bearer ${I18N_AGENT_API_KEY}`
         },
         timeout: 30000
       }
@@ -2385,7 +2385,7 @@ async function main() {
   await server.connect(transport);
   console.error('i18n-agent MCP server running...');
   console.error('MCP_SERVER_URL:', MCP_SERVER_URL);
-  console.error('API_KEY:', API_KEY);
+  console.error('I18N_AGENT_API_KEY:', I18N_AGENT_API_KEY);
 }
 
 main().catch((error) => {

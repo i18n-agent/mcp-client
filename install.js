@@ -175,7 +175,7 @@ function checkExistingApiKey(configPath) {
   try {
     const content = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(content);
-    const apiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY;
+    const apiKey = config.mcpServers?.["i18n-agent"]?.env?.I18N_AGENT_API_KEY;
     return apiKey && apiKey.trim() !== '';
   } catch (error) {
     return false;
@@ -191,7 +191,7 @@ function extractApiKeyFromConfig(configPath) {
   try {
     const content = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(content);
-    const apiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY;
+    const apiKey = config.mcpServers?.["i18n-agent"]?.env?.I18N_AGENT_API_KEY;
     return (apiKey && apiKey.trim() !== '') ? apiKey.trim() : '';
   } catch (error) {
     return '';
@@ -292,7 +292,7 @@ function createMCPConfig() {
         cwd: packageDir,
         env: {
           MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-          API_KEY: ""
+          I18N_AGENT_API_KEY: ""
         },
         disabled: false
       }
@@ -365,9 +365,9 @@ function installViaCodexCLI(existingApiKey = '') {
   ];
 
   if (existingApiKey) {
-    envArgs.push('--env', `API_KEY=${existingApiKey}`);
+    envArgs.push('--env', `I18N_AGENT_API_KEY=${existingApiKey}`);
   } else {
-    envArgs.push('--env', 'API_KEY=');
+    envArgs.push('--env', 'I18N_AGENT_API_KEY=');
   }
 
   // Build the full command
@@ -413,8 +413,8 @@ function isClaudeCodeMCPRegistered(serverName) {
 function getClaudeCodeExistingApiKey(serverName) {
   try {
     const output = execSync(`claude mcp get ${serverName}`, { stdio: 'pipe', encoding: 'utf8' });
-    // Parse output like: API_KEY=i18n_xxx
-    const match = output.match(/API_KEY=([^\s,\n]+)/);
+    // Parse output like: I18N_AGENT_API_KEY=i18n_xxx
+    const match = output.match(/I18N_AGENT_API_KEY=([^\s,\n]+)/);
     if (match && match[1] && match[1] !== '') {
       return match[1];
     }
@@ -428,11 +428,11 @@ function getClaudeCodeExistingApiKey(serverName) {
 function getCodexExistingApiKey(serverName) {
   try {
     const output = execSync(`codex mcp list`, { stdio: 'pipe', encoding: 'utf8' });
-    // Parse output - Codex shows: API_KEY=i18n_xxx, MCP_SERVER_URL=...
+    // Parse output - Codex shows: I18N_AGENT_API_KEY=i18n_xxx, MCP_SERVER_URL=...
     const lines = output.split('\n');
     for (const line of lines) {
       if (line.includes(serverName)) {
-        const match = line.match(/API_KEY=([^\s,]+)/);
+        const match = line.match(/I18N_AGENT_API_KEY=([^\s,]+)/);
         if (match && match[1] && match[1] !== '') {
           return match[1];
         }
@@ -477,9 +477,9 @@ function installViaClaudeCodeCLI(existingApiKey = '', scope = 'user') {
   ];
 
   if (existingApiKey) {
-    envArgs.push('-e', `API_KEY=${existingApiKey}`);
+    envArgs.push('-e', `I18N_AGENT_API_KEY=${existingApiKey}`);
   } else {
-    envArgs.push('-e', 'API_KEY=');
+    envArgs.push('-e', 'I18N_AGENT_API_KEY=');
   }
 
   // Build the full command
@@ -542,8 +542,8 @@ function updateClaudeConfig(configPath, ideKey = 'claude', sharedApiKey = '') {
       config = JSON.parse(content);
 
       // Preserve existing API key if present
-      if (config.mcpServers?.["i18n-agent"]?.env?.API_KEY) {
-        existingApiKey = config.mcpServers["i18n-agent"].env.API_KEY;
+      if (config.mcpServers?.["i18n-agent"]?.env?.I18N_AGENT_API_KEY) {
+        existingApiKey = config.mcpServers["i18n-agent"].env.I18N_AGENT_API_KEY;
         hasApiKey = !!existingApiKey;
         console.log('   🔑 Preserving existing API key');
       }
@@ -577,7 +577,7 @@ function updateClaudeConfig(configPath, ideKey = 'claude', sharedApiKey = '') {
         args: [mcpClientPath],
         env: {
           MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-          API_KEY: existingApiKey || ""
+          I18N_AGENT_API_KEY: existingApiKey || ""
         },
         disabled: false
       };
@@ -586,7 +586,7 @@ function updateClaudeConfig(configPath, ideKey = 'claude', sharedApiKey = '') {
       const baseConfig = createMCPConfig();
       config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
       if (existingApiKey) {
-        config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+        config.mcpServers["i18n-agent"].env.I18N_AGENT_API_KEY = existingApiKey;
       }
     }
   } else {
@@ -600,7 +600,7 @@ function updateClaudeConfig(configPath, ideKey = 'claude', sharedApiKey = '') {
         command: wrapperPath,
         env: {
           MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-          API_KEY: existingApiKey || ""
+          I18N_AGENT_API_KEY: existingApiKey || ""
         },
         disabled: false
       };
@@ -608,7 +608,7 @@ function updateClaudeConfig(configPath, ideKey = 'claude', sharedApiKey = '') {
       const baseConfig = createMCPConfig();
       config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
       if (existingApiKey) {
-        config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+        config.mcpServers["i18n-agent"].env.I18N_AGENT_API_KEY = existingApiKey;
       }
     }
   }
@@ -631,8 +631,8 @@ function updateGenericMCPConfig(configPath, sharedApiKey = '') {
       config = JSON.parse(existing);
 
       // Preserve existing API key if present
-      if (config.mcpServers?.["i18n-agent"]?.env?.API_KEY) {
-        existingApiKey = config.mcpServers["i18n-agent"].env.API_KEY;
+      if (config.mcpServers?.["i18n-agent"]?.env?.I18N_AGENT_API_KEY) {
+        existingApiKey = config.mcpServers["i18n-agent"].env.I18N_AGENT_API_KEY;
         hasApiKey = !!existingApiKey;
         console.log('   🔑 Preserving existing API key');
       }
@@ -664,7 +664,7 @@ function updateGenericMCPConfig(configPath, sharedApiKey = '') {
       cwd: packageDir,
       env: {
         MCP_SERVER_URL: "https://mcp.i18nagent.ai",
-        API_KEY: existingApiKey || ""
+        I18N_AGENT_API_KEY: existingApiKey || ""
       },
       disabled: false
     };
@@ -672,7 +672,7 @@ function updateGenericMCPConfig(configPath, sharedApiKey = '') {
     const baseConfig = createMCPConfig();
     config.mcpServers["i18n-agent"] = baseConfig.mcpServers["i18n-agent"];
     if (existingApiKey) {
-      config.mcpServers["i18n-agent"].env.API_KEY = existingApiKey;
+      config.mcpServers["i18n-agent"].env.I18N_AGENT_API_KEY = existingApiKey;
     }
   }
 
@@ -702,7 +702,7 @@ Supported IDEs:
 Manual setup:
 1. Create the configuration file for your IDE
 2. Add the i18n-agent MCP server configuration
-3. Set your API_KEY environment variable
+3. Set your I18N_AGENT_API_KEY environment variable
 
 For manual setup instructions, visit: https://docs.i18nagent.ai/setup
 `);
@@ -796,7 +796,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
             try {
               const content = fs.readFileSync(ide.configPath, 'utf8');
               const config = JSON.parse(content);
-              existingApiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY || '';
+              existingApiKey = config.mcpServers?.["i18n-agent"]?.env?.I18N_AGENT_API_KEY || '';
             } catch {
               // Ignore parse errors
             }
@@ -835,7 +835,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
             try {
               const content = fs.readFileSync(ide.configPath, 'utf8');
               const config = JSON.parse(content);
-              existingApiKey = config.mcpServers?.["i18n-agent"]?.env?.API_KEY || '';
+              existingApiKey = config.mcpServers?.["i18n-agent"]?.env?.I18N_AGENT_API_KEY || '';
             } catch {
               // Ignore parse errors
             }
@@ -928,7 +928,7 @@ Step 2: Add API key to your IDE`);
           console.log(`
    For Claude Code CLI (recommended):
    claude mcp remove --scope user i18n-agent
-   claude mcp add --transport stdio --scope user i18n-agent -e MCP_SERVER_URL=https://mcp.i18nagent.ai -e API_KEY=your_key_here -- node ~/.claude/mcp-servers/i18n-agent/i18n-agent.js
+   claude mcp add --transport stdio --scope user i18n-agent -e MCP_SERVER_URL=https://mcp.i18nagent.ai -e I18N_AGENT_API_KEY=your_key_here -- node ~/.claude/mcp-servers/i18n-agent/i18n-agent.js
 `);
         }
 
@@ -936,25 +936,25 @@ Step 2: Add API key to your IDE`);
           console.log(`
    For Codex CLI (recommended):
    codex mcp remove i18n-agent
-   codex mcp add --env MCP_SERVER_URL=https://mcp.i18nagent.ai --env API_KEY=your_key_here i18n-agent node ~/.claude/mcp-servers/i18n-agent/i18n-agent.js
+   codex mcp add --env MCP_SERVER_URL=https://mcp.i18nagent.ai --env I18N_AGENT_API_KEY=your_key_here i18n-agent node ~/.claude/mcp-servers/i18n-agent/i18n-agent.js
 `);
         }
 
         console.log(`   For config file method:
-   Open the config file and edit the "API_KEY" field:
+   Open the config file and edit the "I18N_AGENT_API_KEY" field:
 
    "mcpServers": {
      "i18n-agent": {
        "command": "...",
        "env": {
          "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
-         "API_KEY": ""  ← Paste your API key here (between the quotes)
+         "I18N_AGENT_API_KEY": ""  ← Paste your API key here (between the quotes)
        }
      }
    }
 
    Example with actual key:
-   "API_KEY": "i18n_1234567890abcdef"
+   "I18N_AGENT_API_KEY": "i18n_1234567890abcdef"
 
 Step 3: Restart your IDE
    Close and reopen your IDE to load the new configuration

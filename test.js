@@ -69,7 +69,7 @@ try {
   
   // Basic checks
   const hasShebang = mcpClientCode.startsWith('#!/usr/bin/env node');
-  const hasApiKeyCheck = mcpClientCode.includes('if (!API_KEY)');
+  const hasApiKeyCheck = mcpClientCode.includes('if (!I18N_AGENT_API_KEY)');
   const hasGetCredits = mcpClientCode.includes('get_credits');
   const noHardcodedKeys = !mcpClientCode.includes('sk-prod-');
   

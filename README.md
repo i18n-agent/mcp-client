@@ -36,7 +36,7 @@ For Claude Code users, you can install directly from the marketplace:
 
 **Step 2: Set environment variable**
 ```bash
-echo 'export API_KEY=your-api-key-here' >> ~/.zshrc
+echo 'export I18N_AGENT_API_KEY=your-api-key-here' >> ~/.zshrc
 source ~/.zshrc
 ```
 
@@ -58,12 +58,12 @@ That's it! The plugin will automatically use your API key from the environment v
 
 2. **Set environment variable**:
    ```bash
-   export API_KEY=your-api-key-here
+   export I18N_AGENT_API_KEY=your-api-key-here
    ```
 
 3. **Make it permanent** (add to ~/.bashrc or ~/.zshrc):
    ```bash
-   echo 'export API_KEY=your-api-key-here' >> ~/.zshrc
+   echo 'export I18N_AGENT_API_KEY=your-api-key-here' >> ~/.zshrc
    ```
 
 4. **Restart your AI IDE** to load the new configuration
@@ -187,7 +187,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": ["/path/to/i18n-agent.js"],
       "env": {
         "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
-        "API_KEY": "your-api-key-here"
+        "I18N_AGENT_API_KEY": "your-api-key-here"
       }
     }
   }
@@ -205,7 +205,7 @@ Create `.cursor/mcp_settings.json` or `.vscode/mcp_settings.json`:
       "args": ["/path/to/i18n-agent.js"],
       "env": {
         "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
-        "API_KEY": "your-api-key-here"
+        "I18N_AGENT_API_KEY": "your-api-key-here"
       }
     }
   }
@@ -297,7 +297,7 @@ This usually happens with Node Version Managers (nvm, fnm, n). The installer now
          "command": "/Users/YOUR_USERNAME/.claude/run-mcp.sh",
          "env": {
            "MCP_SERVER_URL": "https://mcp.i18nagent.ai",
-           "API_KEY": "your-api-key"
+           "I18N_AGENT_API_KEY": "your-api-key"
          }
        }
      }
@@ -310,8 +310,8 @@ This usually happens with Node Version Managers (nvm, fnm, n). The installer now
 
 **API Key not found:**
 ```bash
-echo $API_KEY  # Should show your key
-export API_KEY=your-key-here
+echo $I18N_AGENT_API_KEY  # Should show your key
+export I18N_AGENT_API_KEY=your-key-here
 ```
 
 **Connection errors:**
