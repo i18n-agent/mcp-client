@@ -1,7 +1,7 @@
 {
   "name": "i18n-agent",
   "description": "🌍 i18n-agent MCP Client - 48 languages, AI-powered translation for Claude Code. Professional translation service with context-aware translations, file translation support, and 48 language variants.",
-  "version": "1.14.1",
+  "version": "1.14.2",
   "author": {
     "name": "FatCouple OÜ",
     "email": "support@i18nagent.ai"
@@ -19,7 +19,6 @@
     "localization",
     "multilingual"
   ],
-  "category": "productivity",
   "mcpServers": {
     "i18n-agent": {
       "command": "node",
