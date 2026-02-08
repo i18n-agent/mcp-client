@@ -25,6 +25,23 @@ i18n-agent
 
 **Note:** Global installation is required due to npm bin naming limitations. The installer will detect all available AI IDEs and configure them automatically.
 
+### Claude Code Marketplace Installation
+
+For Claude Code users, you can install directly from the marketplace:
+
+```bash
+/plugin marketplace add i18n-agent/mcp-client
+/plugin install i18n-agent@i18n-agent
+```
+
+Then set your API key:
+
+```bash
+export API_KEY=your-api-key-here
+```
+
+Restart Claude Code and you're ready to go!
+
 ## 🔑 Setup API Key
 
 1. **Get your API key** from [app.i18nagent.ai](https://app.i18nagent.ai)

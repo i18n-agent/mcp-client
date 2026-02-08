@@ -1,0 +1,41 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "i18n-agent",
+  "version": "1.14.0",
+  "owner": {
+    "name": "FatCouple OÜ",
+    "email": "support@i18nagent.ai"
+  },
+  "metadata": {
+    "description": "Professional AI-powered translation service for Claude Code with 48 languages support",
+    "version": "1.14.0"
+  },
+  "plugins": [
+    {
+      "name": "i18n-agent",
+      "source": ".",
+      "description": "🌍 Professional translation service with context-aware translations, file translation (JSON, YAML, CSV, Markdown), credit tracking, and 48 language support with regional variants",
+      "version": "1.14.0",
+      "author": {
+        "name": "FatCouple OÜ",
+        "email": "support@i18nagent.ai"
+      },
+      "homepage": "https://i18nagent.ai",
+      "repository": "https://github.com/i18n-agent/mcp-client",
+      "license": "MIT",
+      "keywords": [
+        "i18n",
+        "translation",
+        "mcp",
+        "claude",
+        "ai",
+        "internationalization",
+        "localization",
+        "multilingual",
+        "productivity"
+      ],
+      "category": "productivity",
+      "tags": ["translation", "i18n", "localization", "multilingual"]
+    }
+  ]
+}
