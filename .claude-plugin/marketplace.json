@@ -13,7 +13,10 @@
   "plugins": [
     {
       "name": "i18n-agent",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "i18n-agent/mcp-client"
+      },
       "description": "🌍 Professional translation service with context-aware translations, file translation (JSON, YAML, CSV, Markdown), credit tracking, and 48 language support with regional variants",
       "version": "1.14.0",
       "author": {
