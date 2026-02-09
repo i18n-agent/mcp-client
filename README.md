@@ -338,6 +338,32 @@ export I18N_AGENT_API_KEY=your-key-here
 - **API key security**: Keys are stored locally, never transmitted in logs
 - **GDPR compliant**: EU privacy standards
 
+## 🏗️ Architecture
+
+The MCP client installer uses a modular architecture for bulletproof installation:
+
+```
+lib/
+├── config-manager.js      # Config file operations with atomic writes
+├── installer-core.js      # Installation orchestration
+├── transport-detector.js  # Auto-detect SSE vs stdio transport
+└── validator.js          # Input validation and sanitization
+```
+
+### Key Features
+
+- **Atomic Config Writes**: Use temp files + rename for crash safety
+- **Automatic Backups**: Create timestamped backups before modifications
+- **Transport Detection**: Auto-detect SSE vs stdio from config
+- **Comprehensive Validation**: Validate all inputs at module boundaries
+- **Zero External Dependencies**: Uses only Node.js built-ins
+
+### Architecture Details
+
+See detailed documentation:
+- [Module Architecture](lib/README.md) - Module responsibilities and design
+- [Full Architecture Guide](docs/mcp-installer-architecture.md) - Complete system design
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md).
@@ -349,6 +375,15 @@ git clone https://github.com/i18n-agent/mcp-client.git
 cd mcp-client
 npm install
 npm test
+```
+
+### Publishing
+
+Use the publishing script with built-in test gate:
+```bash
+./scripts/publish-mcp-client.sh --dry-run  # Preview package
+./scripts/publish-mcp-client.sh            # Run pre-publish checks
+npm publish                                 # Publish to npm
 ```
 
 ## 📝 License
