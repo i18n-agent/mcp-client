@@ -1,21 +1,57 @@
-# Development files
+# Development and test files (NEVER publish)
 test.js
 test-download-translations.js
-.gitignore
+*.test.js
+tests/
+coverage/
+.nyc_output/
+
+# Environment and config
 .env*
+.envrc
+.tool-versions
 
 # IDE and OS files
 .DS_Store
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 Thumbs.db
 
 # Git
 .git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Build artifacts
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Test outputs
 test-results/
+junit.xml
 
 # Temporary files
 tmp/
 temp/
+*.tmp
+
+# Documentation that should be excluded
+CONTRIBUTING.md
+
+# Keep these files (explicitly NOT ignored)
+# README.md - Included by default
+# LICENSE - Included by default
+# package.json - Included by default
+# index.js - Included by default
