@@ -11,6 +11,11 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
+// Import modular components
+import { detectEnvironment } from './lib/environment-detector.js';
+import { extractExistingApiKey } from './lib/config-writer.js';
+import { createInteractiveSession } from './lib/interactive-setup.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Helper to get platform-specific paths
@@ -184,18 +189,9 @@ function checkExistingApiKey(configPath) {
 
 // Extract actual API key value from a config file
 function extractApiKeyFromConfig(configPath) {
-  if (!fs.existsSync(configPath)) {
-    return '';
-  }
-
-  try {
-    const content = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(content);
-    const apiKey = config.mcpServers?.["i18n-agent"]?.env?.I18N_AGENT_API_KEY;
-    return (apiKey && apiKey.trim() !== '') ? apiKey.trim() : '';
-  } catch (error) {
-    return '';
-  }
+  // Use the modular config writer's extractExistingApiKey function
+  const apiKey = extractExistingApiKey(configPath, 'i18n-agent');
+  return apiKey ? apiKey.trim() : '';
 }
 
 // Find any existing API key from all available IDEs
@@ -301,15 +297,13 @@ function createMCPConfig() {
 }
 
 function detectNodeEnvironment() {
-  // Check if using nvm or other version managers
-  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), '.nvm');
-  const nodeVersion = process.version;
-  const nodePath = process.execPath;
+  // Use the modular environment detector
+  const envInfo = detectEnvironment();
 
   return {
-    isNvm: nodePath.includes('.nvm') || nodePath.includes('nvm'),
-    nodePath,
-    nodeVersion
+    isNvm: envInfo.nodeVersionManager === 'nvm',
+    nodePath: envInfo.nodePath,
+    nodeVersion: process.version
   };
 }
 
