@@ -717,7 +717,7 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
     const { withKeys, withoutKeys } = await checkExistingApiKeys(availableIDEs, claudeCodeCLIAvailable, codexCLIAvailable);
 
     // Find a shared API key from any IDE that has one - will be applied to all IDEs
-    const sharedApiKey = findAnyExistingApiKey(availableIDEs, claudeCodeCLIAvailable, codexCLIAvailable);
+    let sharedApiKey = findAnyExistingApiKey(availableIDEs, claudeCodeCLIAvailable, codexCLIAvailable);
 
     if (withKeys.length > 0 && withoutKeys.length === 0) {
       console.log(`✅ API Keys Already Configured:`);
@@ -750,6 +750,22 @@ For manual setup instructions, visit: https://docs.i18nagent.ai/setup
         console.log(`   - ${ide.name}`);
       });
       console.log(`\n💡 Get your API key at: https://app.i18nagent.ai\n`);
+    }
+
+    // Prompt for API key if none found from any IDE
+    if (!sharedApiKey && withoutKeys.length > 0) {
+      const session = createInteractiveSession();
+      try {
+        const promptedKey = await session.promptForAPIKey();
+        if (promptedKey) {
+          sharedApiKey = promptedKey;
+          console.log('   ✅ API key accepted!\n');
+        } else {
+          console.log('   ⏭️  Skipped. You can add your API key later.\n');
+        }
+      } finally {
+        session.close();
+      }
     }
 
     // Now copy MCP client to stable location
