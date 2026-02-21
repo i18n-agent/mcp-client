@@ -43,6 +43,19 @@ if (!process.env.I18N_AGENT_API_KEY) {
 const MCP_SERVER_URL = process.env.MCP_SERVER_URL;
 const I18N_AGENT_API_KEY = process.env.I18N_AGENT_API_KEY;
 
+// Pre-configured axios client for all MCP JSON-RPC tool calls.
+// Centralises auth header so individual handlers never need to repeat it.
+const mcpAxios = axios.create({
+  baseURL: MCP_SERVER_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${I18N_AGENT_API_KEY}`,
+  },
+});
+
+// Auth header object reused by REST (non-JSON-RPC) calls that also need auth.
+const authHeader = { 'Authorization': `Bearer ${I18N_AGENT_API_KEY}` };
+
 // Heavy load detection - matches error message from service-mcp error-message-sanitizer
 // Exact message: 'Our system is under heavy load, please resume your job later.'
 const HEAVY_LOAD_PATTERNS = [
@@ -609,7 +622,6 @@ async function handleTranslateText(args) {
     params: {
       name: 'translate_text',
       arguments: {
-        apiKey: I18N_AGENT_API_KEY,
         texts: texts,
         targetLanguages: targetLanguages,
         sourceLanguage: sourceLanguage && sourceLanguage !== 'auto' ? sourceLanguage : undefined,
@@ -626,10 +638,7 @@ async function handleTranslateText(args) {
   };
 
   try {
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: isLargeRequest ? 600000 : 300000, // 10 minutes for large requests, 5 minutes for normal
     });
 
@@ -773,10 +782,7 @@ async function handleListLanguages(args) {
   };
   
   try {
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: 30000,
     });
 
@@ -952,7 +958,6 @@ async function handleTranslateFile(args) {
 
   // Build arguments object, filtering out undefined values (they get stripped by JSON.stringify)
   const requestArgs = {
-    apiKey: I18N_AGENT_API_KEY,
     filePath,
     fileContent: content,
     fileType,
@@ -984,10 +989,7 @@ async function handleTranslateFile(args) {
   };
 
   try {
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: isLargeFile ? 600000 : 300000, // 10 minutes for large files, 5 minutes for normal
     });
 
@@ -1163,8 +1165,7 @@ async function pollTranslationJob(jobId, estimatedTime) {
         }
       };
       
-      const response = await axios.post(MCP_SERVER_URL, statusRequest, {
-        headers: { 'Content-Type': 'application/json' },
+      const response = await mcpAxios.post('', statusRequest, {
         timeout: 30000
       });
       
@@ -1261,7 +1262,6 @@ async function handleAnalyzeContent(args) {
     params: {
       name: 'analyze_content',
       arguments: {
-        apiKey: I18N_AGENT_API_KEY,
         content,
         fileType,
         sourceLanguage,
@@ -1274,10 +1274,7 @@ async function handleAnalyzeContent(args) {
   };
 
   try {
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: 60000, // 1 minute timeout for analysis
     });
 
@@ -1311,9 +1308,6 @@ async function handleAnalyzeContent(args) {
 }
 
 async function handleGetCredits(args) {
-  const { apiKey } = args;
-  const creditsApiKey = apiKey || I18N_AGENT_API_KEY;
-
   // Use MCP JSON-RPC protocol for get_credits
   const mcpRequest = {
     jsonrpc: '2.0',
@@ -1321,17 +1315,12 @@ async function handleGetCredits(args) {
     method: 'tools/call',
     params: {
       name: 'get_credits',
-      arguments: {
-        apiKey: creditsApiKey
-      }
+      arguments: {}
     }
   };
 
   try {
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: 30000,
     });
 
@@ -1778,8 +1767,7 @@ async function handleCheckTranslationStatus(args) {
   };
 
   try {
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: { 'Content-Type': 'application/json' },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: 30000
     });
 
@@ -1841,8 +1829,7 @@ async function handleResumeTranslation(args) {
   };
 
   try {
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: { 'Content-Type': 'application/json' },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: 30000
     });
 
@@ -1900,7 +1887,6 @@ async function handleDownloadTranslations(args) {
     params: {
       name: 'download_translations',
       arguments: {
-        apiKey: I18N_AGENT_API_KEY,
         jobId
       }
     }
@@ -1908,8 +1894,7 @@ async function handleDownloadTranslations(args) {
 
   try {
     // Step 1: Get download URLs from MCP server
-    const response = await axios.post(MCP_SERVER_URL, mcpRequest, {
-      headers: { 'Content-Type': 'application/json' },
+    const response = await mcpAxios.post('', mcpRequest, {
       timeout: 30000
     });
 
@@ -2151,7 +2136,7 @@ async function handleSingleFileUpload(args) {
       formData,
       {
         headers: {
-          'Authorization': `Bearer ${I18N_AGENT_API_KEY}`,
+          ...authHeader,
           ...formData.getHeaders()
         },
         timeout: 60000
@@ -2264,7 +2249,7 @@ async function handleParallelDocumentUpload(args) {
       formData,
       {
         headers: {
-          'Authorization': `Bearer ${I18N_AGENT_API_KEY}`,
+          ...authHeader,
           ...formData.getHeaders()
         },
         timeout: 120000
@@ -2325,9 +2310,7 @@ async function handleListUploadedTranslations(args) {
     const response = await axios.get(
       `${MCP_SERVER_URL}/namespaces/${namespace}/translations/files?${params.toString()}`,
       {
-        headers: {
-          'Authorization': `Bearer ${I18N_AGENT_API_KEY}`
-        },
+        headers: authHeader,
         timeout: 30000
       }
     );
