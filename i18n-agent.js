@@ -7,6 +7,14 @@
 
 const MCP_CLIENT_VERSION = '1.13.0';
 
+// CLI argument routing — must run before MCP server initialization
+const _cliCommand = process.argv[2];
+if (_cliCommand === 'install' || _cliCommand === 'setup') {
+  const { main } = await import('./install.js');
+  await main();
+  process.exit(0);
+}
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
