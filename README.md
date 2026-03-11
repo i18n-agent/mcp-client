@@ -19,11 +19,10 @@ Professional translation service client for Claude, Cursor, VS Code, Antigravity
 ## 🚀 Quick Installation
 
 ```bash
-npm install -g @i18n-agent/mcp-client
-i18n-agent
+npx @i18n-agent/mcp-client install
 ```
 
-**Note:** Global installation is required due to npm bin naming limitations. The installer will detect all available AI IDEs and configure them automatically.
+The installer will detect all available AI IDEs and configure them automatically.
 
 ### Claude Code Marketplace Installation
 
