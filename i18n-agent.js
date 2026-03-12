@@ -341,7 +341,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'get_credits',
-        description: 'Get remaining credits for the user and approximate word count available at 0.001 credits per word',
+        description: 'Get remaining credits for the user and approximate word count available at 0.01 credits per word',
         inputSchema: {
           type: 'object',
           properties: {
@@ -1364,7 +1364,7 @@ async function handleGetCredits(args) {
               text: `💰 **Credits Information**\n\n` +
                     `💳 **Credits Remaining**: ${parsed.credits || 'N/A'}\n` +
                     `📝 **Approximate Words Available**: ${approximateWordsAvailable.toLocaleString()}\n` +
-                    `💵 **Cost per Word**: 0.001 credits\n` +
+                    `💵 **Cost per Word**: 0.01 credits\n` +
                     `⏰ **Last Updated**: ${new Date().toLocaleString()}\n\n` +
                     `Note: Word count is approximate and may vary based on actual content complexity and translation requirements.`,
             },
