@@ -234,7 +234,7 @@ Create `.cursor/mcp_settings.json` or `.vscode/mcp_settings.json`:
 - **Automatic Polling**: Client automatically polls for job completion
 
 ### Credit Management
-- **Cost**: 0.01 credits per word
+- **Cost**: 1 credit per word ($0.01/word)
 - **Monitoring**: Check balance before large translations
 - **Estimates**: Get word count estimates before translation
 
@@ -325,7 +325,7 @@ export I18N_AGENT_API_KEY=your-key-here
 
 ## 📊 Pricing
 
-- **Pay-per-use**: 0.01 credits per word
+- **Pay-per-use**: 1 credit per word ($0.01/word)
 - **No subscriptions**: Only pay for what you translate  
 - **Bulk discounts**: Available for enterprise usage
 - **Free tier**: New accounts get starter credits
