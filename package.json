@@ -2,6 +2,7 @@
   "name": "@i18n-agent/mcp-client",
   "version": "1.16.2",
   "description": "🌍 i18n-agent MCP Client - 48 languages, AI-powered translation for Claude, Claude Code, Cursor, VS Code, Codex. Get API key at https://app.i18nagent.ai",
+  "mcpName": "ai.i18nagent/i18n-agent",
   "main": "i18n-agent.js",
   "bin": "i18n-agent.js",
   "type": "module",
