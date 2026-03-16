@@ -7,7 +7,7 @@
     "url": "https://github.com/i18n-agent/mcp-client",
     "source": "github"
   },
-  "version": "1.16.2",
+  "version": "1.16.3",
   "remotes": [
     {
       "type": "streamable-http",
@@ -18,7 +18,7 @@
     {
       "registryType": "npm",
       "identifier": "@i18n-agent/mcp-client",
-      "version": "1.16.2",
+      "version": "1.16.3",
       "transport": {
         "type": "stdio"
       },
